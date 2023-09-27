@@ -37,6 +37,14 @@ public:
         return _pHandle;
     }
 
+    uint width() const {
+        return _width;
+    }
+
+    uint height() const {
+        return _height;
+    }
+
 private:
     GLFWContext _glfwContext;
     GLFWwindow* _pHandle;
