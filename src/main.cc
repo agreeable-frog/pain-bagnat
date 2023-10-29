@@ -221,14 +221,11 @@ int main(void) {
         vk::PhysicalDeviceFeatures physicalDeviceFeatures;
 
         vk::DeviceCreateInfo deviceCreateInfo;
-        deviceCreateInfo.pQueueCreateInfos = queuesCreateInfo.data();
-        deviceCreateInfo.queueCreateInfoCount = queuesCreateInfo.size();
+        deviceCreateInfo.setQueueCreateInfos(queuesCreateInfo);
         deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
-        deviceCreateInfo.enabledExtensionCount = deviceExtensions.size();
-        deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
+        deviceCreateInfo.setPEnabledExtensionNames(deviceExtensions);
 #ifndef NDEBUG
-        deviceCreateInfo.enabledLayerCount = (uint32_t)validationLayers.size();
-        deviceCreateInfo.ppEnabledLayerNames = validationLayers.data();
+        deviceCreateInfo.setPEnabledLayerNames(validationLayers);
 #endif
         device = physicalDevice.createDevice(deviceCreateInfo);
     } catch (std::exception& e) {
@@ -313,13 +310,11 @@ int main(void) {
     vk::raii::ShaderModule fragShaderModule = vk::raii::ShaderModule(nullptr);
     try {
         vk::ShaderModuleCreateInfo vertShaderModuleCreateInfo;
-        vertShaderModuleCreateInfo.codeSize = 4 * vertSpv.size();
-        vertShaderModuleCreateInfo.pCode = vertSpv.data();
+        vertShaderModuleCreateInfo.setCode(vertSpv);
         vertShaderModule = device.createShaderModule(vertShaderModuleCreateInfo);
 
         vk::ShaderModuleCreateInfo fragShaderModuleCreateInfo;
-        fragShaderModuleCreateInfo.codeSize = 4 * fragSpv.size();
-        fragShaderModuleCreateInfo.pCode = fragSpv.data();
+        fragShaderModuleCreateInfo.setCode(fragSpv);
         fragShaderModule = device.createShaderModule(fragShaderModuleCreateInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating shader modules : " << e.what() << '\n';
@@ -335,6 +330,85 @@ int main(void) {
     fragShaderStageInfo.module = *fragShaderModule;
     fragShaderStageInfo.pName = "main";
 
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.pVertexBindingDescriptions = nullptr;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
+    vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo;
+    inputAssemblyInfo.primitiveRestartEnable = false;
+    inputAssemblyInfo.topology = vk::PrimitiveTopology::eTriangleList;
+
+    std::vector<vk::DynamicState> dynamicStates = {vk::DynamicState::eViewport,
+                                                   vk::DynamicState::eScissor};
+
+    vk::PipelineDynamicStateCreateInfo dynamicState;
+    dynamicState.setDynamicStates(dynamicStates);
+
+    vk::PipelineViewportStateCreateInfo viewportState;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    vk::PipelineRasterizationStateCreateInfo rasterizationInfo;
+    rasterizationInfo.depthClampEnable = false;
+    rasterizationInfo.rasterizerDiscardEnable = false;
+    rasterizationInfo.polygonMode = vk::PolygonMode::eFill;
+    rasterizationInfo.lineWidth = 1.0f;
+    rasterizationInfo.cullMode = vk::CullModeFlagBits::eBack;
+    rasterizationInfo.frontFace = vk::FrontFace::eCounterClockwise;
+
+    vk::PipelineMultisampleStateCreateInfo multisampling;
+    multisampling.sampleShadingEnable = false;
+    multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
+
+    vk::PipelineColorBlendAttachmentState colorBlendAttachment;
+    colorBlendAttachment.colorWriteMask =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    colorBlendAttachment.blendEnable = false;
+
+    vk::PipelineColorBlendStateCreateInfo colorBlending;
+    colorBlending.logicOpEnable = false;
+    colorBlending.setAttachments(colorBlendAttachment);
+
+    vk::raii::PipelineLayout pipelineLayout = vk::raii::PipelineLayout(nullptr);
+    try {
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
+        pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating pipeline layout : " << e.what() << '\n';
+        exit(-1);
+    }
+
+    vk::AttachmentDescription colorAttachment;
+    colorAttachment.format = surfaceFormat.format;
+    colorAttachment.samples = vk::SampleCountFlagBits::e1;
+    colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+    colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+    colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+    colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+    colorAttachment.initialLayout = vk::ImageLayout::eUndefined;
+    colorAttachment.finalLayout = vk::ImageLayout::ePresentSrcKHR;
+
+    vk::AttachmentReference colorAttachmentRef;
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
+
+    vk::SubpassDescription subpass;
+    subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+    subpass.setColorAttachments(colorAttachmentRef);
+
+    vk::raii::RenderPass renderPass = vk::raii::RenderPass(nullptr);
+    try {
+        vk::RenderPassCreateInfo renderPassInfo;
+        renderPassInfo.setAttachments(colorAttachment);
+        renderPassInfo.setSubpasses(subpass);
+        renderPass = device.createRenderPass(renderPassInfo);
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating renderPass : " << e.what() << '\n';
+        exit(-1);
+    }
     // Main loop
     while (!glfwWindowShouldClose(pWindow1->handle())) {
         glfwPollEvents();

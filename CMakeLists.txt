@@ -17,7 +17,7 @@ else()
     message(FATAL_ERROR "shaderc not found")
 endif()
 
-configure_file(${PROJECT_SOURCE_DIR}/preprocess_src/build_defs.hh ${CMAKE_CURRENT_BINARY_DIR}/build_defs.hh)
+configure_file(${PROJECT_SOURCE_DIR}/src/build_defs.hh.in ${CMAKE_CURRENT_BINARY_DIR}/build_defs.hh)
 
 set(SOURCES ${PROJECT_SOURCE_DIR}/src/main.cc
             ${PROJECT_SOURCE_DIR}/src/window.cc
