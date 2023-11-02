@@ -78,13 +78,11 @@ int main(void) {
         extensions.push_back(
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME); // we should check that they are supported
 #endif
-        instanceCreateInfo.enabledExtensionCount = extensions.size();
-        instanceCreateInfo.ppEnabledExtensionNames = extensions.data();
+        instanceCreateInfo.setPEnabledExtensionNames(extensions);
 
 #ifndef NDEBUG
         // we should check here that the validation layers are supported
-        instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-        instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
+        instanceCreateInfo.setPEnabledLayerNames(validationLayers);
         vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT =
             getDebugUtilsMessengerCreateInfoEXT();
         instanceCreateInfo.pNext = &debugUtilsMessengerCreateInfoEXT;
@@ -213,9 +211,8 @@ int main(void) {
 
         vk::DeviceQueueCreateInfo graphicsQueueInfo;
         graphicsQueueInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
-        graphicsQueueInfo.queueCount = 1;
         std::vector<float> graphicsQueuePriority = {1.0f};
-        graphicsQueueInfo.pQueuePriorities = graphicsQueuePriority.data();
+        graphicsQueueInfo.setQueuePriorities(graphicsQueuePriority);
         queuesCreateInfo.push_back(graphicsQueueInfo);
 
         vk::PhysicalDeviceFeatures physicalDeviceFeatures;
@@ -358,9 +355,9 @@ int main(void) {
     rasterizationInfo.cullMode = vk::CullModeFlagBits::eBack;
     rasterizationInfo.frontFace = vk::FrontFace::eCounterClockwise;
 
-    vk::PipelineMultisampleStateCreateInfo multisampling;
-    multisampling.sampleShadingEnable = false;
-    multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
+    vk::PipelineMultisampleStateCreateInfo multisamplingInfo;
+    multisamplingInfo.sampleShadingEnable = false;
+    multisamplingInfo.rasterizationSamples = vk::SampleCountFlagBits::e1;
 
     vk::PipelineColorBlendAttachmentState colorBlendAttachment;
     colorBlendAttachment.colorWriteMask =
@@ -407,6 +404,28 @@ int main(void) {
         renderPass = device.createRenderPass(renderPassInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating renderPass : " << e.what() << '\n';
+        exit(-1);
+    }
+
+    vk::GraphicsPipelineCreateInfo graphicsPipelineInfo;
+    std::vector<vk::PipelineShaderStageCreateInfo> stages{vertShaderStageInfo, fragShaderStageInfo};
+    graphicsPipelineInfo.setStages(stages);
+    graphicsPipelineInfo.setPVertexInputState(&vertexInputInfo);
+    graphicsPipelineInfo.setPInputAssemblyState(&inputAssemblyInfo);
+    graphicsPipelineInfo.setPViewportState(&viewportState);
+    graphicsPipelineInfo.setPDynamicState(&dynamicState);
+    graphicsPipelineInfo.setPRasterizationState(&rasterizationInfo);
+    graphicsPipelineInfo.setPMultisampleState(&multisamplingInfo);
+    graphicsPipelineInfo.setPDepthStencilState(0);
+    graphicsPipelineInfo.setPColorBlendState(&colorBlending);
+    graphicsPipelineInfo.setLayout(*pipelineLayout);
+    graphicsPipelineInfo.setRenderPass(*renderPass);
+
+    vk::raii::Pipeline graphicsPipeline = vk::raii::Pipeline(nullptr);
+    try {
+        graphicsPipeline = device.createGraphicsPipeline(nullptr, graphicsPipelineInfo);
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating graphics pipeline : " << e.what() << '\n';
         exit(-1);
     }
     // Main loop
