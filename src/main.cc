@@ -51,6 +51,12 @@ struct SwapChainSupportDetails {
     std::vector<vk::PresentModeKHR> presentModes;
 };
 
+void recordCommandBuffer(vk::raii::CommandBuffer& commandBuffer, uint32_t imageIndex, vk::raii::RenderPass& renderPass) {
+    vk::CommandBufferBeginInfo beginInfo;
+    commandBuffer.begin(beginInfo);
+    vk::RenderPassBeginInfo renderPassInfo;
+}
+
 int main(void) {
     auto pWindow1 = std::make_shared<Window>("window", 800, 450);
 
@@ -428,6 +434,49 @@ int main(void) {
         std::cerr << "Error while creating graphics pipeline : " << e.what() << '\n';
         exit(-1);
     }
+
+    std::vector<vk::raii::Framebuffer> framebuffers;
+    framebuffers.reserve(imageViews.size());
+    for (size_t i = 0; i < imageViews.size(); i++) {
+        try {
+            vk::ImageView attachments[] = {*imageViews[i]};
+            vk::FramebufferCreateInfo framebufferInfo{};
+            framebufferInfo.renderPass = *renderPass;
+            framebufferInfo.setAttachments(attachments);
+            framebufferInfo.width = extent.width;
+            framebufferInfo.height = extent.height;
+            framebufferInfo.layers = 1;
+            framebuffers.push_back(device.createFramebuffer(framebufferInfo));
+        } catch (std::exception& e) {
+            std::cerr << "Error while creating framebuffer : " << e.what() << '\n';
+            exit(-1);
+        }
+    }
+
+    vk::raii::CommandPool commandPool = vk::raii::CommandPool(nullptr);
+    try {
+        vk::CommandPoolCreateInfo commandPoolInfo;
+        commandPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+        commandPoolInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
+        commandPool = device.createCommandPool(commandPoolInfo);
+
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating command pool : " << e.what() << '\n';
+        exit(-1);
+    }
+
+    std::vector<vk::raii::CommandBuffer> commandBuffers;
+    try {
+        vk::CommandBufferAllocateInfo commandBufferAllocInfo;
+        commandBufferAllocInfo.commandPool = *commandPool;
+        commandBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
+        commandBufferAllocInfo.commandBufferCount = 1;
+        commandBuffers = device.allocateCommandBuffers(commandBufferAllocInfo);
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating command buffer : " << e.what() << '\n';
+        exit(-1);
+    }
+
     // Main loop
     while (!glfwWindowShouldClose(pWindow1->handle())) {
         glfwPollEvents();
