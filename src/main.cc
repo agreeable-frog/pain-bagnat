@@ -51,19 +51,13 @@ struct SwapChainSupportDetails {
     std::vector<vk::PresentModeKHR> presentModes;
 };
 
-void recordCommandBuffer(vk::raii::CommandBuffer& commandBuffer, uint32_t imageIndex, vk::raii::RenderPass& renderPass) {
-    vk::CommandBufferBeginInfo beginInfo;
-    commandBuffer.begin(beginInfo);
-    vk::RenderPassBeginInfo renderPassInfo;
-}
-
 int main(void) {
     auto pWindow1 = std::make_shared<Window>("window", 800, 450);
 
     vk::raii::Context context;
 
     // Instance creation, validation layers enabling and debug messenger
-    vk::raii::Instance instance(nullptr);
+    vk::raii::Instance instance = 0;
     try {
         vk::ApplicationInfo appInfo;
         appInfo.pApplicationName = "pain-bagnat";
@@ -100,7 +94,7 @@ int main(void) {
     }
 #ifndef NDEBUG
     // Debug messenger creation
-    vk::raii::DebugUtilsMessengerEXT debugUtilsMessenger(nullptr);
+    vk::raii::DebugUtilsMessengerEXT debugUtilsMessenger = 0;
     try {
         vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT =
             getDebugUtilsMessengerCreateInfoEXT();
@@ -113,7 +107,7 @@ int main(void) {
 #endif
 
     // Surface creation
-    vk::raii::SurfaceKHR surface(nullptr);
+    vk::raii::SurfaceKHR surface = 0;
     try {
         VkSurfaceKHR surfaceTMP;
         auto result = glfwCreateWindowSurface(*instance, pWindow1->handle(), nullptr, &surfaceTMP);
@@ -131,7 +125,7 @@ int main(void) {
     // Physical device query
     const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
     SwapChainSupportDetails deviceSwapChainSupport;
-    vk::raii::PhysicalDevice physicalDevice(nullptr);
+    vk::raii::PhysicalDevice physicalDevice = 0;
     try {
         vk::raii::PhysicalDevices physicalDevices(instance);
         if (physicalDevices.size() == 0) {
@@ -211,7 +205,7 @@ int main(void) {
     }
 
     // Device creation
-    vk::raii::Device device(nullptr);
+    vk::raii::Device device = 0;
     try {
         std::vector<vk::DeviceQueueCreateInfo> queuesCreateInfo;
 
@@ -236,7 +230,7 @@ int main(void) {
         exit(-1);
     }
 
-    vk::raii::Queue graphicsQueue = vk::raii::Queue(nullptr);
+    vk::raii::Queue graphicsQueue = 0;
     try {
         graphicsQueue = device.getQueue(graphicsQueueFamilyIndex, 0);
     } catch (std::exception& e) {
@@ -247,7 +241,7 @@ int main(void) {
     // SwapChain creation
     vk::SurfaceFormatKHR surfaceFormat = {vk::Format::eB8G8R8A8Srgb,
                                           vk::ColorSpaceKHR::eSrgbNonlinear};
-    vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
+    vk::PresentModeKHR presentMode = vk::PresentModeKHR::eMailbox;
     // Missing many checks here
     vk::Extent2D extent = {pWindow1->width(), pWindow1->height()};
     extent.width =
@@ -256,7 +250,8 @@ int main(void) {
     extent.height =
         std::clamp(extent.height, deviceSwapChainSupport.capabilities.minImageExtent.height,
                    deviceSwapChainSupport.capabilities.maxImageExtent.height);
-    vk::raii::SwapchainKHR swapChain = vk::raii::SwapchainKHR(nullptr);
+
+    vk::raii::SwapchainKHR swapChain = 0;
     uint32_t imageCount = deviceSwapChainSupport.capabilities.minImageCount + 1;
     try {
         vk::SwapchainCreateInfoKHR swapChainCreateInfo;
@@ -309,8 +304,8 @@ int main(void) {
     auto fragSpv = ShaderCompiler::compileAssembly(
         std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.frag", SHADER_TYPE::FRAG);
 
-    vk::raii::ShaderModule vertShaderModule = vk::raii::ShaderModule(nullptr);
-    vk::raii::ShaderModule fragShaderModule = vk::raii::ShaderModule(nullptr);
+    vk::raii::ShaderModule vertShaderModule = 0;
+    vk::raii::ShaderModule fragShaderModule = 0;
     try {
         vk::ShaderModuleCreateInfo vertShaderModuleCreateInfo;
         vertShaderModuleCreateInfo.setCode(vertSpv);
@@ -375,7 +370,7 @@ int main(void) {
     colorBlending.logicOpEnable = false;
     colorBlending.setAttachments(colorBlendAttachment);
 
-    vk::raii::PipelineLayout pipelineLayout = vk::raii::PipelineLayout(nullptr);
+    vk::raii::PipelineLayout pipelineLayout = 0;
     try {
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
         pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
@@ -402,11 +397,19 @@ int main(void) {
     subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
     subpass.setColorAttachments(colorAttachmentRef);
 
-    vk::raii::RenderPass renderPass = vk::raii::RenderPass(nullptr);
+    vk::raii::RenderPass renderPass = 0;
     try {
         vk::RenderPassCreateInfo renderPassInfo;
         renderPassInfo.setAttachments(colorAttachment);
         renderPassInfo.setSubpasses(subpass);
+        vk::SubpassDependency dependency;
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+        dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        dependency.srcAccessMask = vk::AccessFlagBits::eNone;
+        dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+        renderPassInfo.setDependencies(dependency);
         renderPass = device.createRenderPass(renderPassInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating renderPass : " << e.what() << '\n';
@@ -427,7 +430,7 @@ int main(void) {
     graphicsPipelineInfo.setLayout(*pipelineLayout);
     graphicsPipelineInfo.setRenderPass(*renderPass);
 
-    vk::raii::Pipeline graphicsPipeline = vk::raii::Pipeline(nullptr);
+    vk::raii::Pipeline graphicsPipeline = 0;
     try {
         graphicsPipeline = device.createGraphicsPipeline(nullptr, graphicsPipelineInfo);
     } catch (std::exception& e) {
@@ -453,7 +456,7 @@ int main(void) {
         }
     }
 
-    vk::raii::CommandPool commandPool = vk::raii::CommandPool(nullptr);
+    vk::raii::CommandPool commandPool = 0;
     try {
         vk::CommandPoolCreateInfo commandPoolInfo;
         commandPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
@@ -465,20 +468,87 @@ int main(void) {
         exit(-1);
     }
 
-    std::vector<vk::raii::CommandBuffer> commandBuffers;
+    vk::raii::CommandBuffer commandBuffer = 0;
     try {
         vk::CommandBufferAllocateInfo commandBufferAllocInfo;
         commandBufferAllocInfo.commandPool = *commandPool;
         commandBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
         commandBufferAllocInfo.commandBufferCount = 1;
-        commandBuffers = device.allocateCommandBuffers(commandBufferAllocInfo);
+        commandBuffer = std::move(device.allocateCommandBuffers(commandBufferAllocInfo).at(0));
     } catch (std::exception& e) {
         std::cerr << "Error while creating command buffer : " << e.what() << '\n';
+        exit(-1);
+    }
+
+    vk::raii::Semaphore imageAvailableSemaphore = 0;
+    vk::raii::Semaphore renderFinishedSemaphore = 0;
+    vk::raii::Fence inFlightFence = 0;
+
+    try {
+        vk::SemaphoreCreateInfo semaphoreInfo;
+        imageAvailableSemaphore = device.createSemaphore(semaphoreInfo);
+        renderFinishedSemaphore = device.createSemaphore(semaphoreInfo);
+
+        vk::FenceCreateInfo fenceInfo;
+        fenceInfo.flags = vk::FenceCreateFlagBits::eSignaled;
+        inFlightFence = device.createFence(fenceInfo);
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating sync elements : " << e.what() << '\n';
         exit(-1);
     }
 
     // Main loop
     while (!glfwWindowShouldClose(pWindow1->handle())) {
         glfwPollEvents();
+        auto result = device.waitForFences(*inFlightFence, true, UINT_FAST64_MAX);
+        device.resetFences(*inFlightFence);
+        uint32_t imageIndex =
+            swapChain.acquireNextImage(UINT_FAST64_MAX, *imageAvailableSemaphore, nullptr).second;
+        commandBuffer.reset();
+
+        vk::CommandBufferBeginInfo beginInfo;
+        commandBuffer.begin(beginInfo);
+        vk::RenderPassBeginInfo renderPassInfo;
+        renderPassInfo.renderPass = *renderPass;
+        renderPassInfo.framebuffer = *framebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = vk::Offset2D{0, 0};
+        renderPassInfo.renderArea.extent = extent;
+        vk::ClearValue clearValue = vk::ClearValue{{0.0f, 0.0f, 0.0f, 1.0f}};
+        renderPassInfo.setClearValues(clearValue);
+        commandBuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
+
+        vk::Viewport viewport;
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(extent.width);
+        viewport.height = static_cast<float>(extent.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        commandBuffer.setViewport(0, viewport);
+
+        vk::Rect2D scissor;
+        scissor.offset = vk::Offset2D{0, 0};
+        scissor.extent = extent;
+        commandBuffer.setScissor(0, scissor);
+
+        commandBuffer.draw(3, 1, 0, 0);
+        commandBuffer.endRenderPass();
+        commandBuffer.end();
+
+        vk::SubmitInfo submitInfo;
+        submitInfo.setWaitSemaphores(*imageAvailableSemaphore);
+        vk::PipelineStageFlags waitStages = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        submitInfo.setWaitDstStageMask(waitStages);
+        submitInfo.setCommandBuffers(*commandBuffer);
+        submitInfo.setSignalSemaphores(*renderFinishedSemaphore);
+        graphicsQueue.submit(submitInfo, *inFlightFence);
+
+        vk::PresentInfoKHR presentInfo;
+        presentInfo.setWaitSemaphores(*renderFinishedSemaphore);
+        presentInfo.setSwapchains(*swapChain);
+        presentInfo.setImageIndices(imageIndex);
+        graphicsQueue.presentKHR(presentInfo);
     }
+    device.waitIdle();
 }
