@@ -11,232 +11,30 @@
 #include "shader_compiler.hh"
 #include "window.hh"
 #include "build_defs.hh"
+#include "utils.hh"
 
-#ifndef NDEBUG
 const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
-
-VKAPI_ATTR VkBool32 VKAPI_CALL
-debugMessageFunc(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                 VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                 VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData, void* /*pUserData*/) {
-    std::ostringstream message;
-
-    message << vk::to_string(static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverity))
-            << " " << vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypes))
-            << ":\n";
-    message << "<" << pCallbackData->pMessage << ">";
-    std::cout << message.str() << '\n';
-    return false;
-}
-
-vk::DebugUtilsMessengerCreateInfoEXT getDebugUtilsMessengerCreateInfoEXT() {
-    vk::DebugUtilsMessengerCreateInfoEXT instanceDebugUtilsMessengerCreateInfoEXT;
-    vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
-    vk::DebugUtilsMessageTypeFlagsEXT messageTypeFlags(
-        vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-        vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
-        vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation);
-    instanceDebugUtilsMessengerCreateInfoEXT.messageSeverity = severityFlags;
-    instanceDebugUtilsMessengerCreateInfoEXT.messageType = messageTypeFlags;
-    instanceDebugUtilsMessengerCreateInfoEXT.pfnUserCallback = &debugMessageFunc;
-    return instanceDebugUtilsMessengerCreateInfoEXT;
-}
-#endif
-
-struct SwapChainSupportDetails {
-    vk::SurfaceCapabilitiesKHR capabilities;
-    std::vector<vk::SurfaceFormatKHR> formats;
-    std::vector<vk::PresentModeKHR> presentModes;
-};
 
 int main(void) {
     auto pWindow1 = std::make_shared<Window>("window", 800, 450);
 
     vk::raii::Context context;
-
-    // Instance creation, validation layers enabling and debug messenger
-    vk::raii::Instance instance = 0;
-    try {
-        vk::ApplicationInfo appInfo;
-        appInfo.pApplicationName = "pain-bagnat";
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "No Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_3;
-
-        vk::InstanceCreateInfo instanceCreateInfo;
-        instanceCreateInfo.pApplicationInfo = &appInfo;
-
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
-        glfwExtensions = glfwGetRequiredInstanceExtensions(
-            &glfwExtensionCount); // we should check that they are supported
-        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    vk::raii::Instance instance = createInstance(context);
 #ifndef NDEBUG
-        extensions.push_back(
-            VK_EXT_DEBUG_UTILS_EXTENSION_NAME); // we should check that they are supported
+    vk::raii::DebugUtilsMessengerEXT debugUtilsMessenger = createDebugMessenger(instance);
 #endif
-        instanceCreateInfo.setPEnabledExtensionNames(extensions);
-
-#ifndef NDEBUG
-        // we should check here that the validation layers are supported
-        instanceCreateInfo.setPEnabledLayerNames(validationLayers);
-        vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT =
-            getDebugUtilsMessengerCreateInfoEXT();
-        instanceCreateInfo.pNext = &debugUtilsMessengerCreateInfoEXT;
-#endif
-        instance = context.createInstance(instanceCreateInfo);
-    } catch (std::exception& e) {
-        std::cerr << "Error while creating instance : " << e.what() << '\n';
-        exit(-1);
-    }
-#ifndef NDEBUG
-    // Debug messenger creation
-    vk::raii::DebugUtilsMessengerEXT debugUtilsMessenger = 0;
-    try {
-        vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT =
-            getDebugUtilsMessengerCreateInfoEXT();
-        debugUtilsMessenger =
-            instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
-    } catch (std::exception& e) {
-        std::cerr << "Error while creating debug messenger : " << e.what() << '\n';
-        exit(-1);
-    }
-#endif
-
-    // Surface creation
-    vk::raii::SurfaceKHR surface = 0;
-    try {
-        VkSurfaceKHR surfaceTMP;
-        auto result = glfwCreateWindowSurface(*instance, pWindow1->handle(), nullptr, &surfaceTMP);
-        if (result != VkResult::VK_SUCCESS) {
-            std::ostringstream os;
-            os << "glfwCreateWindowSurface failed : " << int(result);
-            throw std::runtime_error(os.str());
-        }
-        surface = vk::raii::SurfaceKHR(instance, surfaceTMP);
-    } catch (std::exception& e) {
-        std::cerr << "Error while creating surface : " << e.what() << '\n';
-        exit(-1);
-    }
-
-    // Physical device query
-    const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-    SwapChainSupportDetails deviceSwapChainSupport;
-    vk::raii::PhysicalDevice physicalDevice = 0;
-    try {
-        vk::raii::PhysicalDevices physicalDevices(instance);
-        if (physicalDevices.size() == 0) {
-            throw std::runtime_error("No physical device found");
-        }
-        int selectedDeviceScore = 0;
-        for (const auto& aPhysicalDevice : physicalDevices) {
-            auto availableExtensions = aPhysicalDevice.enumerateDeviceExtensionProperties();
-            std::set<std::string> requiredExtensions(deviceExtensions.begin(),
-                                                     deviceExtensions.end());
-            for (const auto& extension : availableExtensions) {
-                requiredExtensions.erase(extension.extensionName);
-            }
-            if (!requiredExtensions.empty()) continue;
-
-            SwapChainSupportDetails aDeviceSwapChainSupport;
-            aDeviceSwapChainSupport.capabilities =
-                aPhysicalDevice.getSurfaceCapabilitiesKHR(*surface);
-            aDeviceSwapChainSupport.formats = aPhysicalDevice.getSurfaceFormatsKHR(*surface);
-            aDeviceSwapChainSupport.presentModes =
-                aPhysicalDevice.getSurfacePresentModesKHR(*surface);
-            if (aDeviceSwapChainSupport.formats.empty() ||
-                aDeviceSwapChainSupport.presentModes.empty())
-                continue;
-
-            auto props = aPhysicalDevice.getProperties();
-            auto features = aPhysicalDevice.getFeatures();
-            int score = 0;
-            if (props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) score += 100;
-            if (props.deviceType == vk::PhysicalDeviceType::eIntegratedGpu) score += 50;
-            if (score >= selectedDeviceScore) {
-                physicalDevice = aPhysicalDevice;
-                deviceSwapChainSupport = aDeviceSwapChainSupport;
-                selectedDeviceScore = score;
-            }
-        }
-        if (selectedDeviceScore == 0) {
-            throw std::runtime_error("No physical device could be selected");
-        }
-        auto props = physicalDevice.getProperties();
-        auto features = physicalDevice.getFeatures();
-        std::cout << props.deviceName << " selected\n";
-    } catch (std::exception& e) {
-        std::cerr << "Error while selecting physical device : " << e.what() << '\n';
-        exit(-1);
-    }
+    vk::raii::SurfaceKHR surface = createSurface(instance, pWindow1);
+    vk::raii::PhysicalDevice physicalDevice = selectPhysicalDevice(instance, surface);
+    const SwapChainSupportDetails deviceSwapChainSupport =
+        getPhysicalDeviceSwapChainSupportDetails(physicalDevice, surface);
 
     // Queue family queries
-    size_t graphicsQueueFamilyIndex;
-    try {
-        int selectedGraphicsScore = 0;
-        auto queueFamilyProps = physicalDevice.getQueueFamilyProperties();
-        for (size_t i = 0; i < queueFamilyProps.size(); i++) {
-            const vk::QueueFamilyProperties& queueFamilyProp = queueFamilyProps.at(i);
-            int graphicsScore = 0;
-            if (queueFamilyProp.queueFlags & vk::QueueFlagBits::eGraphics) {
-                graphicsScore += 50; // graphics able queue
-            }
-            if (!(queueFamilyProp.queueFlags & vk::QueueFlagBits::eTransfer)) {
-                graphicsScore += 50;
-            }
-            if (!physicalDevice.getSurfaceSupportKHR(i, *surface)) {
-                graphicsScore = -1; // presentation support
-            }
-            graphicsScore *= queueFamilyProp.queueCount;
-            if (graphicsScore >= selectedGraphicsScore) {
-                graphicsQueueFamilyIndex = i;
-                selectedGraphicsScore = graphicsScore;
-            }
-        }
-        if (selectedGraphicsScore == 0) {
-            throw std::runtime_error("No graphics able queue was found");
-        }
-    } catch (std::exception& e) {
-        std::cerr << "Error while selecting queue families : " << e.what() << '\n';
-        exit(-1);
-    }
+    size_t graphicsQueueFamilyIndex = selectGraphicsQueueFamilyIndex(physicalDevice, surface);
 
     // Device creation
-    vk::raii::Device device = 0;
-    try {
-        std::vector<vk::DeviceQueueCreateInfo> queuesCreateInfo;
+    vk::raii::Device device = createDevice(physicalDevice, graphicsQueueFamilyIndex);
 
-        vk::DeviceQueueCreateInfo graphicsQueueInfo;
-        graphicsQueueInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
-        std::vector<float> graphicsQueuePriority = {1.0f};
-        graphicsQueueInfo.setQueuePriorities(graphicsQueuePriority);
-        queuesCreateInfo.push_back(graphicsQueueInfo);
-
-        vk::PhysicalDeviceFeatures physicalDeviceFeatures;
-
-        vk::DeviceCreateInfo deviceCreateInfo;
-        deviceCreateInfo.setQueueCreateInfos(queuesCreateInfo);
-        deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
-        deviceCreateInfo.setPEnabledExtensionNames(deviceExtensions);
-#ifndef NDEBUG
-        deviceCreateInfo.setPEnabledLayerNames(validationLayers);
-#endif
-        device = physicalDevice.createDevice(deviceCreateInfo);
-    } catch (std::exception& e) {
-        std::cerr << "Error while creating device : " << e.what() << '\n';
-        exit(-1);
-    }
-
-    vk::raii::Queue graphicsQueue = 0;
-    try {
-        graphicsQueue = device.getQueue(graphicsQueueFamilyIndex, 0);
-    } catch (std::exception& e) {
-        std::cerr << "Error while retrieving queues : " << e.what() << '\n';
-        exit(-1);
-    }
+    vk::raii::Queue graphicsQueue = getQueue(device, graphicsQueueFamilyIndex, 0);
 
     // SwapChain creation
     vk::SurfaceFormatKHR surfaceFormat = {vk::Format::eB8G8R8A8Srgb,
@@ -251,73 +49,16 @@ int main(void) {
         std::clamp(extent.height, deviceSwapChainSupport.capabilities.minImageExtent.height,
                    deviceSwapChainSupport.capabilities.maxImageExtent.height);
 
-    vk::raii::SwapchainKHR swapChain = 0;
-    uint32_t imageCount = deviceSwapChainSupport.capabilities.minImageCount + 1;
-    try {
-        vk::SwapchainCreateInfoKHR swapChainCreateInfo;
-        swapChainCreateInfo.surface = *surface;
-        swapChainCreateInfo.minImageCount = imageCount;
-        swapChainCreateInfo.imageFormat = surfaceFormat.format;
-        swapChainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
-        swapChainCreateInfo.imageExtent = extent;
-        swapChainCreateInfo.imageArrayLayers = 1;
-        swapChainCreateInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
-        swapChainCreateInfo.imageSharingMode =
-            vk::SharingMode::eExclusive; // graphics and present queue families are the same
-        swapChainCreateInfo.preTransform = deviceSwapChainSupport.capabilities.currentTransform;
-        swapChainCreateInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-        swapChainCreateInfo.presentMode = presentMode;
-        swapChainCreateInfo.clipped = VK_TRUE;
-        swapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
-        swapChain = device.createSwapchainKHR(swapChainCreateInfo);
-    } catch (std::exception& e) {
-        std::cerr << "Error while creating swapchain : " << e.what() << '\n';
-        exit(-1);
-    }
+    vk::raii::SwapchainKHR swapchain =
+        createSwapchain(device, surface, deviceSwapChainSupport, pWindow1);
 
-    std::vector<vk::raii::ImageView> imageViews;
-    try {
-        auto swapChainImages = swapChain.getImages();
-        for (auto& image : swapChainImages) {
-            vk::ImageViewCreateInfo imageViewCreateInfo;
-            imageViewCreateInfo.image = image;
-            imageViewCreateInfo.format = surfaceFormat.format;
-            imageViewCreateInfo.viewType = vk::ImageViewType::e2D;
-            imageViewCreateInfo.components.r = vk::ComponentSwizzle::eIdentity;
-            imageViewCreateInfo.components.g = vk::ComponentSwizzle::eIdentity;
-            imageViewCreateInfo.components.b = vk::ComponentSwizzle::eIdentity;
-            imageViewCreateInfo.components.a = vk::ComponentSwizzle::eIdentity;
-            imageViewCreateInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-            imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-            imageViewCreateInfo.subresourceRange.levelCount = 1;
-            imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-            imageViewCreateInfo.subresourceRange.layerCount = 1;
-            imageViews.push_back(device.createImageView(imageViewCreateInfo));
-        }
-    } catch (std::exception& e) {
-        std::cerr << "Error while creating swapchain image views : " << e.what() << '\n';
-        exit(-1);
-    }
+    std::vector<vk::raii::ImageView> imageViews =
+        createImageViews(device, swapchain, surfaceFormat);
 
-    auto vertSpv = ShaderCompiler::compileAssembly(
-        std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.vert", SHADER_TYPE::VERT);
-    auto fragSpv = ShaderCompiler::compileAssembly(
-        std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.frag", SHADER_TYPE::FRAG);
-
-    vk::raii::ShaderModule vertShaderModule = 0;
-    vk::raii::ShaderModule fragShaderModule = 0;
-    try {
-        vk::ShaderModuleCreateInfo vertShaderModuleCreateInfo;
-        vertShaderModuleCreateInfo.setCode(vertSpv);
-        vertShaderModule = device.createShaderModule(vertShaderModuleCreateInfo);
-
-        vk::ShaderModuleCreateInfo fragShaderModuleCreateInfo;
-        fragShaderModuleCreateInfo.setCode(fragSpv);
-        fragShaderModule = device.createShaderModule(fragShaderModuleCreateInfo);
-    } catch (std::exception& e) {
-        std::cerr << "Error while creating shader modules : " << e.what() << '\n';
-        exit(-1);
-    }
+    vk::raii::ShaderModule vertShaderModule = createShaderModule(
+        device, std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.vert", SHADER_TYPE::VERT);
+    vk::raii::ShaderModule fragShaderModule = createShaderModule(
+        device, std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.frag", SHADER_TYPE::FRAG);
 
     vk::PipelineShaderStageCreateInfo vertShaderStageInfo;
     vertShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
@@ -503,7 +244,7 @@ int main(void) {
         auto result = device.waitForFences(*inFlightFence, true, UINT_FAST64_MAX);
         device.resetFences(*inFlightFence);
         uint32_t imageIndex =
-            swapChain.acquireNextImage(UINT_FAST64_MAX, *imageAvailableSemaphore, nullptr).second;
+            swapchain.acquireNextImage(UINT_FAST64_MAX, *imageAvailableSemaphore, nullptr).second;
         commandBuffer.reset();
 
         vk::CommandBufferBeginInfo beginInfo;
@@ -546,7 +287,7 @@ int main(void) {
 
         vk::PresentInfoKHR presentInfo;
         presentInfo.setWaitSemaphores(*renderFinishedSemaphore);
-        presentInfo.setSwapchains(*swapChain);
+        presentInfo.setSwapchains(*swapchain);
         presentInfo.setImageIndices(imageIndex);
         graphicsQueue.presentKHR(presentInfo);
     }

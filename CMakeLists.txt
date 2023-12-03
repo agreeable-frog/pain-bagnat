@@ -21,7 +21,8 @@ configure_file(${PROJECT_SOURCE_DIR}/src/build_defs.hh.in ${CMAKE_CURRENT_BINARY
 
 set(SOURCES ${PROJECT_SOURCE_DIR}/src/main.cc
             ${PROJECT_SOURCE_DIR}/src/window.cc
-            ${PROJECT_SOURCE_DIR}/src/shader_compiler.cc)
+            ${PROJECT_SOURCE_DIR}/src/shader_compiler.cc
+            ${PROJECT_SOURCE_DIR}/src/utils.cc)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
