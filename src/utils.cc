@@ -481,7 +481,8 @@ vk::raii::CommandPool makeCommandPool(const vk::raii::Device& device, uint32_t q
     }
 }
 
-vk::raii::CommandBuffer makeCommandBuffer(const vk::raii::Device& device, const vk::raii::CommandPool& commandPool) {
+vk::raii::CommandBuffer makeCommandBuffer(const vk::raii::Device& device,
+                                          const vk::raii::CommandPool& commandPool) {
     try {
         vk::CommandBufferAllocateInfo commandBufferAllocInfo;
         commandBufferAllocInfo.commandPool = *commandPool;
@@ -492,4 +493,23 @@ vk::raii::CommandBuffer makeCommandBuffer(const vk::raii::Device& device, const 
         std::cerr << "Error while creating command buffer : " << e.what() << '\n';
         exit(-1);
     }
+}
+
+SyncObjects makeSyncObjects(
+    const vk::raii::Device& device) {
+    SyncObjects syncObjects;
+
+    try {
+        vk::SemaphoreCreateInfo semaphoreInfo;
+        syncObjects.imageAvailableSemaphore = device.createSemaphore(semaphoreInfo);
+        syncObjects.renderFinishedSemaphore = device.createSemaphore(semaphoreInfo);
+
+        vk::FenceCreateInfo fenceInfo;
+        fenceInfo.flags = vk::FenceCreateFlagBits::eSignaled;
+        syncObjects.inFlightFence = device.createFence(fenceInfo);
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating sync elements : " << e.what() << '\n';
+        exit(-1);
+    }
+    return syncObjects;
 }

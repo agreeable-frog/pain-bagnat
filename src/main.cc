@@ -1,12 +1,8 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
-#include <vulkan/vulkan_to_string.hpp>
 #include <string>
 #include <memory>
 #include <iostream>
-#include <ostream>
-#include <sstream>
-#include <set>
 
 #include "shader_compiler.hh"
 #include "window.hh"
@@ -67,18 +63,11 @@ int main(void) {
     vk::raii::Semaphore imageAvailableSemaphore = 0;
     vk::raii::Semaphore renderFinishedSemaphore = 0;
     vk::raii::Fence inFlightFence = 0;
-
-    try {
-        vk::SemaphoreCreateInfo semaphoreInfo;
-        imageAvailableSemaphore = device.createSemaphore(semaphoreInfo);
-        renderFinishedSemaphore = device.createSemaphore(semaphoreInfo);
-
-        vk::FenceCreateInfo fenceInfo;
-        fenceInfo.flags = vk::FenceCreateFlagBits::eSignaled;
-        inFlightFence = device.createFence(fenceInfo);
-    } catch (std::exception& e) {
-        std::cerr << "Error while creating sync elements : " << e.what() << '\n';
-        exit(-1);
+    {
+        auto syncObjects = makeSyncObjects(device);
+        imageAvailableSemaphore = std::move(syncObjects.imageAvailableSemaphore);
+        renderFinishedSemaphore = std::move(syncObjects.renderFinishedSemaphore);
+        inFlightFence = std::move(syncObjects.inFlightFence);
     }
 
     // Main loop

@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
+#include <tuple>
 
 #include "window.hh"
 #include "shader_compiler.hh"
@@ -46,4 +47,11 @@ std::vector<vk::raii::Framebuffer> makeFramebuffers(
     const vk::raii::Device& device, const std::vector<vk::raii::ImageView>& imageViews,
     const vk::raii::RenderPass& renderPass, vk::Extent2D extent);
 vk::raii::CommandPool makeCommandPool(const vk::raii::Device& device, uint32_t queueFamilyIndex);
-vk::raii::CommandBuffer makeCommandBuffer(const vk::raii::Device& device, const vk::raii::CommandPool& commandPool);
+vk::raii::CommandBuffer makeCommandBuffer(const vk::raii::Device& device,
+                                          const vk::raii::CommandPool& commandPool);
+struct SyncObjects {
+    vk::raii::Semaphore imageAvailableSemaphore = 0;
+    vk::raii::Semaphore renderFinishedSemaphore = 0;
+    vk::raii::Fence inFlightFence = 0;
+};
+SyncObjects makeSyncObjects(const vk::raii::Device& device);
