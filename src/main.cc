@@ -8,8 +8,19 @@
 #include "window.hh"
 #include "build_defs.hh"
 #include "utils.hh"
+#include "shader_defs.hh"
 
-const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+uint32_t findMemoryType(const vk::raii::PhysicalDevice& physicalDevice, uint32_t typeFilter,
+                        vk::MemoryPropertyFlags properties) {
+    vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    throw std::runtime_error("failed to find suitable memory type!");
+}
 
 int main(void) {
     auto pWindow1 = std::make_shared<Window>("window", 800, 450);
@@ -54,9 +65,40 @@ int main(void) {
     vk::raii::Pipeline graphicsPipeline = makeGraphicsPipeline(device, pipelineLayout, renderPass,
                                                                vertShaderModule, fragShaderModule);
 
-    std::vector<vk::raii::Framebuffer> framebuffers = makeFramebuffers(device, imageViews, renderPass, extent);
+    std::vector<vk::raii::Framebuffer> framebuffers =
+        makeFramebuffers(device, imageViews, renderPass, extent);
 
     vk::raii::CommandPool commandPool = makeCommandPool(device, graphicsQueueFamilyIndex);
+
+    std::vector<VertexBasic> vertices = {{{-0.5, 0.5, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
+                                         {{0.5, 0.5, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
+                                         {{0.0, -0.5, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}}
+
+    };
+
+    vk::raii::Buffer vertexBuffer = 0;
+    try {
+        vk::BufferCreateInfo bufferInfo;
+        bufferInfo.setSize(sizeof(vertices[0]) * vertices.size());
+        bufferInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
+        bufferInfo.setSharingMode(vk::SharingMode::eExclusive);
+        vertexBuffer = device.createBuffer(bufferInfo);
+    } catch (std::exception& e) {
+        exit(-1);
+    }
+
+    vk::MemoryRequirements memRequirements = vertexBuffer.getMemoryRequirements();
+
+    vk::MemoryAllocateInfo allocateInfo;
+    allocateInfo.allocationSize = memRequirements.size;
+    allocateInfo.memoryTypeIndex = findMemoryType(
+        physicalDevice, memRequirements.memoryTypeBits,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    vk::raii::DeviceMemory vertexBufferMemory = device.allocateMemory(allocateInfo);
+    vertexBuffer.bindMemory(*vertexBufferMemory, 0);
+    void* data = vertexBufferMemory.mapMemory(0, sizeof(vertices[0]) * vertices.size());
+    std::memcpy(data, vertices.data(), (uint32_t)(sizeof(vertices[0]) * vertices.size()));
+    vertexBufferMemory.unmapMemory();
 
     vk::raii::CommandBuffer commandBuffer = makeCommandBuffer(device, commandPool);
 
@@ -90,6 +132,7 @@ int main(void) {
         renderPassInfo.setClearValues(clearValue);
         commandBuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
         commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
+        commandBuffer.bindVertexBuffers(0, {*vertexBuffer}, {0});
 
         vk::Viewport viewport;
         viewport.x = 0.0f;
@@ -105,7 +148,7 @@ int main(void) {
         scissor.extent = extent;
         commandBuffer.setScissor(0, scissor);
 
-        commandBuffer.draw(3, 1, 0, 0);
+        commandBuffer.draw((uint32_t)vertices.size(), 1, 0, 0);
         commandBuffer.endRenderPass();
         commandBuffer.end();
 

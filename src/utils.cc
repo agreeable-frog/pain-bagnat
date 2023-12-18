@@ -8,6 +8,8 @@
 #include <string>
 #include <algorithm>
 
+#include "shader_defs.hh"
+
 const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
 const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
@@ -383,10 +385,10 @@ vk::raii::Pipeline makeGraphicsPipeline(const vk::raii::Device& device,
     std::vector<vk::PipelineShaderStageCreateInfo> stages{vertShaderStageInfo, fragShaderStageInfo};
 
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = nullptr;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+    vk::VertexInputBindingDescription vertexBasicBindingDescription = VertexBasic::bindingDescription();
+    vertexInputInfo.setVertexBindingDescriptions(vertexBasicBindingDescription);
+    std::array<vk::VertexInputAttributeDescription, 3> vertexBasicAttributeDescriptions = VertexBasic::attributeDescriptions();
+    vertexInputInfo.setVertexAttributeDescriptions(vertexBasicAttributeDescriptions);
 
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo;
     inputAssemblyInfo.primitiveRestartEnable = false;
