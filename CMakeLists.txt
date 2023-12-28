@@ -20,9 +20,12 @@ endif()
 configure_file(${PROJECT_SOURCE_DIR}/src/build_defs.hh.in ${CMAKE_CURRENT_BINARY_DIR}/build_defs.hh)
 
 set(SOURCES ${PROJECT_SOURCE_DIR}/src/main.cc
-            ${PROJECT_SOURCE_DIR}/src/window.cc
             ${PROJECT_SOURCE_DIR}/src/shader_compiler.cc
-            ${PROJECT_SOURCE_DIR}/src/utils.cc)
+            ${PROJECT_SOURCE_DIR}/src/instance.cc
+            ${PROJECT_SOURCE_DIR}/src/display.cc
+            ${PROJECT_SOURCE_DIR}/src/device.cc
+            ${PROJECT_SOURCE_DIR}/src/swap_chain.cc
+            ${PROJECT_SOURCE_DIR}/src/pipeline.cc)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
