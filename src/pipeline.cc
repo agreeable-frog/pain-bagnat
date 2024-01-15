@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include "build_defs.hh"
-#include "shader_defs.hh"
 
 namespace render {
 void Pipeline::createVertShaderModule(const vk::raii::Device& device) {

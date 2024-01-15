@@ -1,4 +1,3 @@
-#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
 #include "instance.hh"
@@ -6,7 +5,6 @@
 #include "device.hh"
 #include "swap_chain.hh"
 #include "pipeline.hh"
-#include "shader_defs.hh"
 
 int main(void) {
     render::Instance instance = render::Instance();
@@ -28,7 +26,13 @@ int main(void) {
         vk::BufferCreateInfo bufferInfo;
         bufferInfo.setSize(sizeof(vertices[0]) * vertices.size());
         bufferInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
-        bufferInfo.setSharingMode(vk::SharingMode::eExclusive);
+        if (device.graphicsTransferSame())
+            bufferInfo.setSharingMode(vk::SharingMode::eExclusive);
+        else
+            bufferInfo.setSharingMode(vk::SharingMode::eConcurrent);
+        uint32_t queueIndex[2] = {device.graphicsQueueFamily().index,
+                                  device.transferQueueFamily().index};
+        bufferInfo.setQueueFamilyIndices(queueIndex);
         vertexBuffer = device.device().createBuffer(bufferInfo);
     } catch (std::exception& e) {
         exit(-1);
@@ -87,7 +91,9 @@ int main(void) {
         auto result = device.device().waitForFences(*inFlightFence, true, UINT_FAST64_MAX);
         device.device().resetFences(*inFlightFence);
         uint32_t imageIndex =
-            swapChain.swapChain().acquireNextImage(UINT_FAST64_MAX, *imageAvailableSemaphore, nullptr).second;
+            swapChain.swapChain()
+                .acquireNextImage(UINT_FAST64_MAX, *imageAvailableSemaphore, nullptr)
+                .second;
         device.graphicsCommandBuffer().reset();
 
         vk::CommandBufferBeginInfo beginInfo;
@@ -99,8 +105,10 @@ int main(void) {
         renderPassInfo.renderArea.extent = swapChain.extent();
         vk::ClearValue clearValue = vk::ClearValue{{0.0f, 0.0f, 0.0f, 1.0f}};
         renderPassInfo.setClearValues(clearValue);
-        device.graphicsCommandBuffer().beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
-        device.graphicsCommandBuffer().bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline());
+        device.graphicsCommandBuffer().beginRenderPass(renderPassInfo,
+                                                       vk::SubpassContents::eInline);
+        device.graphicsCommandBuffer().bindPipeline(vk::PipelineBindPoint::eGraphics,
+                                                    *pipeline.pipeline());
         device.graphicsCommandBuffer().bindVertexBuffers(0, {*vertexBuffer}, {0});
 
         vk::Viewport viewport;

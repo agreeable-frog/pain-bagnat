@@ -55,8 +55,24 @@ void Device::selectPhysicalDevice(const vk::raii::Instance& instance,
     }
 }
 
-void Device::selectGraphicsQueueFamily(const vk::raii::Instance& instance,
-                                       const vk::raii::SurfaceKHR& surface) {
+void Device::listPhysicalDeviceQueueFamilies(const vk::raii::SurfaceKHR& surface) const {
+    auto queueFamilyProps = _physicalDevice.getQueueFamilyProperties();
+    std::cout << "Available queue families\n";
+    for (size_t i = 0; i < queueFamilyProps.size(); i++) {
+        const vk::QueueFamilyProperties& queueFamilyProp = queueFamilyProps.at(i);
+        std::cout << i << ":";
+        std::cout << " count " << queueFamilyProp.queueCount;
+        std::cout << " graphics "
+                  << (queueFamilyProp.queueFlags & vk::QueueFlagBits::eGraphics ? "yes" : "no");
+        std::cout << " transfer "
+                  << (queueFamilyProp.queueFlags & vk::QueueFlagBits::eTransfer ? "yes" : "no");
+        std::cout << " presentation "
+                  << (_physicalDevice.getSurfaceSupportKHR(i, *surface) ? "yes" : "no");
+        std::cout << '\n';
+    }
+}
+
+void Device::selectGraphicsQueueFamily(const vk::raii::SurfaceKHR& surface) {
     try {
         int selectedGraphicsScore = 0;
         auto queueFamilyProps = _physicalDevice.getQueueFamilyProperties();
@@ -88,6 +104,29 @@ void Device::selectGraphicsQueueFamily(const vk::raii::Instance& instance,
     }
 }
 
+void Device::selectTransferQueueFamily() {
+    try {
+        auto queueFamilyProps = _physicalDevice.getQueueFamilyProperties();
+        for (size_t i = 0; i < queueFamilyProps.size(); i++) {
+            const vk::QueueFamilyProperties& queueFamilyProp = queueFamilyProps.at(i);
+            if ((queueFamilyProp.queueFlags & vk::QueueFlagBits::eTransfer) &&
+                !(queueFamilyProp.queueFlags & vk::QueueFlagBits::eGraphics)) {
+                _transferQueueFamily.index = i;
+                _transferQueueFamily.properties = queueFamilyProp;
+                return;
+            }
+        }
+        std::cout << "Transfer specialised family queue was not found, defaulting to the graphics "
+                     "family queue\n";
+        _transferQueueFamily.index = _graphicsQueueFamily.index;
+        _transferQueueFamily.properties = _graphicsQueueFamily.properties;
+        _graphicsTransferSame = true;
+    } catch (std::exception& e) {
+        std::cerr << "Error while selecting queue families : " << e.what() << '\n';
+        exit(-1);
+    }
+}
+
 void Device::createDevice(const vk::raii::Instance& instance) {
     try {
         std::vector<vk::DeviceQueueCreateInfo> queuesCreateInfo;
@@ -96,7 +135,13 @@ void Device::createDevice(const vk::raii::Instance& instance) {
         graphicsQueueInfo.queueFamilyIndex = _graphicsQueueFamily.index;
         std::vector<float> graphicsQueuePriority = {1.0f};
         graphicsQueueInfo.setQueuePriorities(graphicsQueuePriority);
-        queuesCreateInfo.push_back(graphicsQueueInfo);
+
+        vk::DeviceQueueCreateInfo transferQueueInfo;
+        transferQueueInfo.queueFamilyIndex = _transferQueueFamily.index;
+        std::vector<float> transferQueuePriority = {1.0f};
+        transferQueueInfo.setQueuePriorities(transferQueuePriority);
+
+        queuesCreateInfo.push_back(transferQueueInfo);
 
         vk::PhysicalDeviceFeatures physicalDeviceFeatures;
 
@@ -123,6 +168,15 @@ void Device::createGraphicsQueue() {
     }
 }
 
+void Device::createTransferQueue() {
+    try {
+        _transferQueue = _device.getQueue(_transferQueueFamily.index, 0);
+    } catch (std::exception& e) {
+        std::cerr << "Error while retrieving queue : " << e.what() << '\n';
+        exit(-1);
+    }
+}
+
 void Device::createGraphicsCommandPool() {
     try {
         vk::CommandPoolCreateInfo commandPoolInfo;
@@ -136,13 +190,41 @@ void Device::createGraphicsCommandPool() {
     }
 }
 
+void Device::createTransferCommandPool() {
+    try {
+        vk::CommandPoolCreateInfo commandPoolInfo;
+        commandPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+        commandPoolInfo.queueFamilyIndex = _transferQueueFamily.index;
+        _transferCommandPool = _device.createCommandPool(commandPoolInfo);
+
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating command pool : " << e.what() << '\n';
+        exit(-1);
+    }
+}
+
 void Device::createGraphicsCommandBuffer() {
     try {
         vk::CommandBufferAllocateInfo commandBufferAllocInfo;
         commandBufferAllocInfo.commandPool = *_graphicsCommandPool;
         commandBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
         commandBufferAllocInfo.commandBufferCount = 1;
-        _graphicsCommandBuffer = std::move(_device.allocateCommandBuffers(commandBufferAllocInfo).at(0));
+        _graphicsCommandBuffer =
+            std::move(_device.allocateCommandBuffers(commandBufferAllocInfo).at(0));
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating command buffer : " << e.what() << '\n';
+        exit(-1);
+    }
+}
+
+void Device::createTransferCommandBuffer() {
+    try {
+        vk::CommandBufferAllocateInfo commandBufferAllocInfo;
+        commandBufferAllocInfo.commandPool = *_transferCommandPool;
+        commandBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
+        commandBufferAllocInfo.commandBufferCount = 1;
+        _graphicsCommandBuffer =
+            std::move(_device.allocateCommandBuffers(commandBufferAllocInfo).at(0));
     } catch (std::exception& e) {
         std::cerr << "Error while creating command buffer : " << e.what() << '\n';
         exit(-1);
@@ -151,11 +233,16 @@ void Device::createGraphicsCommandBuffer() {
 
 Device::Device(const render::Instance& instance, const vk::raii::SurfaceKHR& surface) {
     selectPhysicalDevice(instance, surface);
-    selectGraphicsQueueFamily(instance, surface);
+    listPhysicalDeviceQueueFamilies(surface);
+    selectGraphicsQueueFamily(surface);
+    selectTransferQueueFamily();
     createDevice(instance);
     createGraphicsQueue();
+    createTransferQueue();
     createGraphicsCommandPool();
+    createTransferCommandPool();
     createGraphicsCommandBuffer();
+    createTransferCommandBuffer();
 }
 
 uint32_t Device::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const {
