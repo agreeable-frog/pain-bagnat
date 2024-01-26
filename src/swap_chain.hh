@@ -18,7 +18,7 @@ private:
     std::vector<vk::raii::ImageView> _imageViews;
 
     void createSwapChain(const vk::raii::Device& device, const vk::raii::SurfaceKHR& surface,
-                         const Device::SwapChainSupport deviceSwapChainSupport);
+                         const SwapChainSupport deviceSwapChainSupport);
     void createImageViews(const vk::raii::Device& device);
 
 public:

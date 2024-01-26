@@ -4,6 +4,8 @@
 #include <set>
 
 #include "global_defs.hh"
+#define VMA_IMPLEMENTATION
+#include "vk_mem_alloc.h"
 
 namespace render {
 
@@ -120,7 +122,6 @@ void Device::selectTransferQueueFamily() {
                      "family queue\n";
         _transferQueueFamily.index = _graphicsQueueFamily.index;
         _transferQueueFamily.properties = _graphicsQueueFamily.properties;
-        _graphicsTransferSame = true;
     } catch (std::exception& e) {
         std::cerr << "Error while selecting queue families : " << e.what() << '\n';
         exit(-1);
@@ -135,15 +136,17 @@ void Device::createDevice(const vk::raii::Instance& instance) {
         graphicsQueueInfo.queueFamilyIndex = _graphicsQueueFamily.index;
         std::vector<float> graphicsQueuePriority = {1.0f};
         graphicsQueueInfo.setQueuePriorities(graphicsQueuePriority);
+        queuesCreateInfo.push_back(graphicsQueueInfo);
 
         vk::DeviceQueueCreateInfo transferQueueInfo;
         transferQueueInfo.queueFamilyIndex = _transferQueueFamily.index;
         std::vector<float> transferQueuePriority = {1.0f};
         transferQueueInfo.setQueuePriorities(transferQueuePriority);
-
         queuesCreateInfo.push_back(transferQueueInfo);
 
         vk::PhysicalDeviceFeatures physicalDeviceFeatures;
+        physicalDeviceFeatures.sparseBinding = VK_TRUE;
+        physicalDeviceFeatures.sparseResidencyBuffer = VK_TRUE;
 
         vk::DeviceCreateInfo deviceCreateInfo;
         deviceCreateInfo.setQueueCreateInfos(queuesCreateInfo);
@@ -157,6 +160,18 @@ void Device::createDevice(const vk::raii::Instance& instance) {
         std::cerr << "Error while creating device : " << e.what() << '\n';
         exit(-1);
     }
+}
+
+void Device::createAllocator(const vk::raii::Instance& instance) {
+    VmaAllocatorCreateInfo allocatorCreateInfo{}; // Don't forget to zero init!!!
+    allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+    allocatorCreateInfo.instance = *instance;
+    allocatorCreateInfo.physicalDevice = *_physicalDevice;
+    allocatorCreateInfo.device = *_device;
+    auto result = vmaCreateAllocator(&allocatorCreateInfo, &_allocator);
+    if (result != VkResult::VK_SUCCESS) {
+        std::cout << "vmaCreateAllocator failed : " << result << "\n";
+    };
 }
 
 void Device::createGraphicsQueue() {
@@ -223,7 +238,7 @@ void Device::createTransferCommandBuffer() {
         commandBufferAllocInfo.commandPool = *_transferCommandPool;
         commandBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
         commandBufferAllocInfo.commandBufferCount = 1;
-        _graphicsCommandBuffer =
+        _transferCommandBuffer =
             std::move(_device.allocateCommandBuffers(commandBufferAllocInfo).at(0));
     } catch (std::exception& e) {
         std::cerr << "Error while creating command buffer : " << e.what() << '\n';
@@ -237,12 +252,17 @@ Device::Device(const render::Instance& instance, const vk::raii::SurfaceKHR& sur
     selectGraphicsQueueFamily(surface);
     selectTransferQueueFamily();
     createDevice(instance);
+    createAllocator(instance);
     createGraphicsQueue();
     createTransferQueue();
     createGraphicsCommandPool();
     createTransferCommandPool();
     createGraphicsCommandBuffer();
     createTransferCommandBuffer();
+}
+
+Device::~Device() {
+    vmaDestroyAllocator(_allocator);
 }
 
 uint32_t Device::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const {

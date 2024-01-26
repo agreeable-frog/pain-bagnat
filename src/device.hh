@@ -4,26 +4,28 @@
 #include <vector>
 
 #include "instance.hh"
+#include "vk_mem_alloc.h"
 
 namespace render {
+struct SwapChainSupport {
+    vk::SurfaceCapabilitiesKHR capabilities;
+    std::vector<vk::SurfaceFormatKHR> formats;
+    std::vector<vk::PresentModeKHR> presentModes;
+};
+
+struct QueueFamily {
+    uint32_t index;
+    vk::QueueFamilyProperties properties;
+};
+
 class Device {
 public:
-    struct SwapChainSupport {
-        vk::SurfaceCapabilitiesKHR capabilities;
-        std::vector<vk::SurfaceFormatKHR> formats;
-        std::vector<vk::PresentModeKHR> presentModes;
-    };
-    struct QueueFamily {
-        uint32_t index;
-        vk::QueueFamilyProperties properties;
-    };
-
 private:
     vk::raii::PhysicalDevice _physicalDevice = 0;
     vk::raii::Device _device = 0;
+    VmaAllocator _allocator;
     QueueFamily _graphicsQueueFamily;
     QueueFamily _transferQueueFamily;
-    bool _graphicsTransferSame = false;
     vk::raii::Queue _graphicsQueue = 0;
     vk::raii::Queue _transferQueue = 0;
     SwapChainSupport _swapChainSupport;
@@ -38,6 +40,7 @@ private:
     void selectGraphicsQueueFamily(const vk::raii::SurfaceKHR& surface);
     void selectTransferQueueFamily();
     void createDevice(const vk::raii::Instance& instance);
+    void createAllocator(const vk::raii::Instance& instance);
     void createGraphicsQueue();
     void createTransferQueue();
     void createGraphicsCommandPool();
@@ -47,9 +50,16 @@ private:
 
 public:
     Device(const render::Instance& instance, const vk::raii::SurfaceKHR& surface);
+    ~Device();
     uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
+    const vk::raii::PhysicalDevice& physicalDevice() const {
+        return _physicalDevice;
+    }
     const vk::raii::Device& device() const {
         return _device;
+    }
+    const VmaAllocator& allocator() const {
+        return _allocator;
     }
     const vk::raii::Queue& graphicsQueue() const {
         return _graphicsQueue;
@@ -62,9 +72,6 @@ public:
     }
     const QueueFamily& transferQueueFamily() const {
         return _transferQueueFamily;
-    }
-    bool graphicsTransferSame() const {
-        return _graphicsTransferSame;
     }
     const SwapChainSupport& swapChainSupport() const {
         return _swapChainSupport;

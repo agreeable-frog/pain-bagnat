@@ -11,7 +11,7 @@ uint GLFWContext::_instancingCount = 0;
 
 void Instance::createInstance() {
     try {
-        vk::ApplicationInfo appInfo;
+        vk::ApplicationInfo appInfo{};
         appInfo.pApplicationName = "pain-bagnat";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";

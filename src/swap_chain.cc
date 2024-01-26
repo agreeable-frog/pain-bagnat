@@ -17,7 +17,7 @@ SwapChain::SwapChain(const render::Display& display, const render::Device& devic
 }
 
 void SwapChain::createSwapChain(const vk::raii::Device& device, const vk::raii::SurfaceKHR& surface,
-                                const Device::SwapChainSupport deviceSwapChainSupport) {
+                                const SwapChainSupport deviceSwapChainSupport) {
     try {
         vk::SwapchainCreateInfoKHR swapChainCreateInfo;
         swapChainCreateInfo.surface = *surface;

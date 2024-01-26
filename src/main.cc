@@ -5,6 +5,7 @@
 #include "device.hh"
 #include "swap_chain.hh"
 #include "pipeline.hh"
+#include "buffer.hh"
 
 int main(void) {
     render::Instance instance = render::Instance();
@@ -21,34 +22,10 @@ int main(void) {
 
     };
 
-    vk::raii::Buffer vertexBuffer = 0;
-    try {
-        vk::BufferCreateInfo bufferInfo;
-        bufferInfo.setSize(sizeof(vertices[0]) * vertices.size());
-        bufferInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
-        if (device.graphicsTransferSame())
-            bufferInfo.setSharingMode(vk::SharingMode::eExclusive);
-        else
-            bufferInfo.setSharingMode(vk::SharingMode::eConcurrent);
-        uint32_t queueIndex[2] = {device.graphicsQueueFamily().index,
-                                  device.transferQueueFamily().index};
-        bufferInfo.setQueueFamilyIndices(queueIndex);
-        vertexBuffer = device.device().createBuffer(bufferInfo);
-    } catch (std::exception& e) {
-        exit(-1);
-    }
-
-    vk::MemoryRequirements memRequirements = vertexBuffer.getMemoryRequirements();
-    vk::MemoryAllocateInfo allocateInfo;
-    allocateInfo.allocationSize = memRequirements.size;
-    allocateInfo.memoryTypeIndex = device.findMemoryType(
-        memRequirements.memoryTypeBits,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    vk::raii::DeviceMemory vertexBufferMemory = device.device().allocateMemory(allocateInfo);
-    vertexBuffer.bindMemory(*vertexBufferMemory, 0);
-    void* data = vertexBufferMemory.mapMemory(0, sizeof(vertices[0]) * vertices.size());
-    std::memcpy(data, vertices.data(), (uint32_t)(sizeof(vertices[0]) * vertices.size()));
-    vertexBufferMemory.unmapMemory();
+    render::Buffer vertexBuffer = render::Buffer(
+        device, sizeof(vertices[0]) * vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        {device.graphicsQueueFamily().index, device.transferQueueFamily().index});
+    vertexBuffer.mapData(vertices.data(), sizeof(vertices[0]) * vertices.size());
 
     vk::raii::Semaphore imageAvailableSemaphore = 0;
     vk::raii::Semaphore renderFinishedSemaphore = 0;
@@ -109,7 +86,7 @@ int main(void) {
                                                        vk::SubpassContents::eInline);
         device.graphicsCommandBuffer().bindPipeline(vk::PipelineBindPoint::eGraphics,
                                                     *pipeline.pipeline());
-        device.graphicsCommandBuffer().bindVertexBuffers(0, {*vertexBuffer}, {0});
+        device.graphicsCommandBuffer().bindVertexBuffers(0, {vertexBuffer.buffer()}, {0});
 
         vk::Viewport viewport;
         viewport.x = 0.0f;

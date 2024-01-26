@@ -40,5 +40,8 @@ public:
     operator const vk::raii::Instance&() const {
         return _instance;
     }
+    const vk::raii::Instance& instance() const {
+        return _instance;
+    }
 };
 } // namespace render
