@@ -16,16 +16,22 @@ int main(void) {
 
     render::Pipeline pipeline = render::Pipeline(device, swapChain);
 
-    std::vector<VertexBasic> vertices = {{{-0.5, 0.5, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
-                                         {{0.5, 0.5, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
-                                         {{0.0, -0.5, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}}
+    std::vector<VertexBasic> vertices = {{{0.8, -0.8, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
+                                         {{-0.8, -0.8, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
+                                         {{-0.8, 0.8, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
+                                         {{0.8, 0.8, 0.8}, {0.0, 0.0, 0.0}, {0.0, 0.0}}
 
     };
 
-    render::Buffer vertexBuffer = render::Buffer(
-        device, sizeof(vertices[0]) * vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        {device.graphicsQueueFamily().index, device.transferQueueFamily().index});
-    vertexBuffer.mapData(vertices.data(), sizeof(vertices[0]) * vertices.size());
+    std::vector<uint32_t> indices = {0, 1, 2, 0, 2, 3};
+
+    render::Buffer vertexBuffer = render::Buffer(device, sizeof(VertexBasic) * vertices.size(),
+                                                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    vertexBuffer.mapData(device, vertices.data(), sizeof(VertexBasic) * vertices.size());
+
+    render::Buffer indexBuffer =
+        render::Buffer(device, sizeof(uint32_t) * indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    indexBuffer.mapData(device, indices.data(), sizeof(uint32_t) * indices.size());
 
     vk::raii::Semaphore imageAvailableSemaphore = 0;
     vk::raii::Semaphore renderFinishedSemaphore = 0;
@@ -87,6 +93,7 @@ int main(void) {
         device.graphicsCommandBuffer().bindPipeline(vk::PipelineBindPoint::eGraphics,
                                                     *pipeline.pipeline());
         device.graphicsCommandBuffer().bindVertexBuffers(0, {vertexBuffer.buffer()}, {0});
+        device.graphicsCommandBuffer().bindIndexBuffer(indexBuffer.buffer(), 0, vk::IndexType::eUint32);
 
         vk::Viewport viewport;
         viewport.x = 0.0f;
@@ -102,7 +109,7 @@ int main(void) {
         scissor.extent = swapChain.extent();
         device.graphicsCommandBuffer().setScissor(0, scissor);
 
-        device.graphicsCommandBuffer().draw((uint32_t)vertices.size(), 1, 0, 0);
+        device.graphicsCommandBuffer().drawIndexed((uint32_t)indices.size(), 1, 0, 0, 0);
         device.graphicsCommandBuffer().endRenderPass();
         device.graphicsCommandBuffer().end();
 

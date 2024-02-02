@@ -32,7 +32,6 @@ private:
     vk::raii::CommandPool _graphicsCommandPool = 0;
     vk::raii::CommandPool _transferCommandPool = 0;
     vk::raii::CommandBuffer _graphicsCommandBuffer = 0;
-    vk::raii::CommandBuffer _transferCommandBuffer = 0;
 
     void selectPhysicalDevice(const vk::raii::Instance& instance,
                               const vk::raii::SurfaceKHR& surface);
@@ -46,7 +45,6 @@ private:
     void createGraphicsCommandPool();
     void createTransferCommandPool();
     void createGraphicsCommandBuffer();
-    void createTransferCommandBuffer();
 
 public:
     Device(const render::Instance& instance, const vk::raii::SurfaceKHR& surface);
@@ -76,11 +74,11 @@ public:
     const SwapChainSupport& swapChainSupport() const {
         return _swapChainSupport;
     }
+    const vk::raii::CommandPool& transferCommandPool() const {
+        return _transferCommandPool;
+    }
     const vk::raii::CommandBuffer& graphicsCommandBuffer() const {
         return _graphicsCommandBuffer;
-    }
-    const vk::raii::CommandBuffer& transferCommandBuffer() const {
-        return _transferCommandBuffer;
     }
 };
 

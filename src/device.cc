@@ -208,7 +208,7 @@ void Device::createGraphicsCommandPool() {
 void Device::createTransferCommandPool() {
     try {
         vk::CommandPoolCreateInfo commandPoolInfo;
-        commandPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+        commandPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer & vk::CommandPoolCreateFlagBits::eTransient;
         commandPoolInfo.queueFamilyIndex = _transferQueueFamily.index;
         _transferCommandPool = _device.createCommandPool(commandPoolInfo);
 
@@ -232,20 +232,6 @@ void Device::createGraphicsCommandBuffer() {
     }
 }
 
-void Device::createTransferCommandBuffer() {
-    try {
-        vk::CommandBufferAllocateInfo commandBufferAllocInfo;
-        commandBufferAllocInfo.commandPool = *_transferCommandPool;
-        commandBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
-        commandBufferAllocInfo.commandBufferCount = 1;
-        _transferCommandBuffer =
-            std::move(_device.allocateCommandBuffers(commandBufferAllocInfo).at(0));
-    } catch (std::exception& e) {
-        std::cerr << "Error while creating command buffer : " << e.what() << '\n';
-        exit(-1);
-    }
-}
-
 Device::Device(const render::Instance& instance, const vk::raii::SurfaceKHR& surface) {
     selectPhysicalDevice(instance, surface);
     listPhysicalDeviceQueueFamilies(surface);
@@ -258,7 +244,6 @@ Device::Device(const render::Instance& instance, const vk::raii::SurfaceKHR& sur
     createGraphicsCommandPool();
     createTransferCommandPool();
     createGraphicsCommandBuffer();
-    createTransferCommandBuffer();
 }
 
 Device::~Device() {
