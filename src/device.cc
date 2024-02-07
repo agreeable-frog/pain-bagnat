@@ -138,15 +138,15 @@ void Device::createDevice(const vk::raii::Instance& instance) {
         graphicsQueueInfo.setQueuePriorities(graphicsQueuePriority);
         queuesCreateInfo.push_back(graphicsQueueInfo);
 
-        vk::DeviceQueueCreateInfo transferQueueInfo;
-        transferQueueInfo.queueFamilyIndex = _transferQueueFamily.index;
-        std::vector<float> transferQueuePriority = {1.0f};
-        transferQueueInfo.setQueuePriorities(transferQueuePriority);
-        queuesCreateInfo.push_back(transferQueueInfo);
+        if (_transferQueueFamily.index != _graphicsQueueFamily.index) {
+            vk::DeviceQueueCreateInfo transferQueueInfo;
+            transferQueueInfo.queueFamilyIndex = _transferQueueFamily.index;
+            std::vector<float> transferQueuePriority = {1.0f};
+            transferQueueInfo.setQueuePriorities(transferQueuePriority);
+            queuesCreateInfo.push_back(transferQueueInfo);
+        }
 
         vk::PhysicalDeviceFeatures physicalDeviceFeatures;
-        physicalDeviceFeatures.sparseBinding = VK_TRUE;
-        physicalDeviceFeatures.sparseResidencyBuffer = VK_TRUE;
 
         vk::DeviceCreateInfo deviceCreateInfo;
         deviceCreateInfo.setQueueCreateInfos(queuesCreateInfo);
@@ -208,7 +208,8 @@ void Device::createGraphicsCommandPool() {
 void Device::createTransferCommandPool() {
     try {
         vk::CommandPoolCreateInfo commandPoolInfo;
-        commandPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer & vk::CommandPoolCreateFlagBits::eTransient;
+        commandPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer &
+                                vk::CommandPoolCreateFlagBits::eTransient;
         commandPoolInfo.queueFamilyIndex = _transferQueueFamily.index;
         _transferCommandPool = _device.createCommandPool(commandPoolInfo);
 
