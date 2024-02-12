@@ -9,10 +9,12 @@ void Pipeline::createVertShaderModule(const vk::raii::Device& device) {
     _vertShaderModule = createShaderModule(
         device, std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.vert", SHADER_TYPE::VERT);
 }
+
 void Pipeline::createFragShaderModule(const vk::raii::Device& device) {
     _fragShaderModule = createShaderModule(
         device, std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.frag", SHADER_TYPE::FRAG);
 }
+
 vk::raii::ShaderModule Pipeline::createShaderModule(const vk::raii::Device& device,
                                                     const std::string& path, SHADER_TYPE type) {
     try {
@@ -27,15 +29,35 @@ vk::raii::ShaderModule Pipeline::createShaderModule(const vk::raii::Device& devi
         exit(-1);
     }
 }
+
+void Pipeline::createDescriptorSetLayout(const vk::raii::Device& device) {
+    try {
+        vk::DescriptorSetLayoutBinding uboLayoutBinding;
+        uboLayoutBinding.binding = 0;
+        uboLayoutBinding.descriptorType = vk::DescriptorType::eUniformBuffer;
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+        vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutInfo;
+        descriptorSetLayoutInfo.setBindings(uboLayoutBinding);
+        _descriptorSetLayout = device.createDescriptorSetLayout(descriptorSetLayoutInfo);
+    } catch (std::exception& e) {
+        std::cerr << "Error while creating descriptor set layout : " << e.what() << '\n';
+        exit(-1);
+    }
+}
+
 void Pipeline::createPipelineLayout(const vk::raii::Device& device) {
     try {
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
+        // pipelineLayoutInfo.setSetLayouts(*_descriptorSetLayout);
         _layout = device.createPipelineLayout(pipelineLayoutInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating pipeline layout : " << e.what() << '\n';
         exit(-1);
     }
 }
+
 void Pipeline::createRenderPass(const vk::raii::Device& device, vk::Format format) {
     vk::AttachmentDescription colorAttachment;
     colorAttachment.format = format;
@@ -73,6 +95,7 @@ void Pipeline::createRenderPass(const vk::raii::Device& device, vk::Format forma
         exit(-1);
     }
 }
+
 void Pipeline::createGraphicsPipeline(const vk::raii::Device& device) {
     vk::PipelineShaderStageCreateInfo vertShaderStageInfo;
     vertShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
@@ -148,6 +171,7 @@ void Pipeline::createGraphicsPipeline(const vk::raii::Device& device) {
         exit(-1);
     }
 }
+
 void Pipeline::createFramebuffers(const vk::raii::Device& device,
                                   const std::vector<vk::raii::ImageView>& imageViews,
                                   vk::Extent2D extent) {
@@ -172,6 +196,7 @@ void Pipeline::createFramebuffers(const vk::raii::Device& device,
 Pipeline::Pipeline(const render::Device& device, const render::SwapChain& swapChain) {
     createVertShaderModule(device.device());
     createFragShaderModule(device.device());
+    // createDescriptorSetLayout(device.device());
     createPipelineLayout(device.device());
     createRenderPass(device.device(), swapChain.surfaceFormat().format);
     createGraphicsPipeline(device.device());

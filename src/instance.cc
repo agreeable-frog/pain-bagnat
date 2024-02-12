@@ -4,8 +4,6 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-#include "global_defs.hh"
-
 namespace render {
 uint GLFWContext::_instancingCount = 0;
 

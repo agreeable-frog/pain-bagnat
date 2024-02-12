@@ -3,7 +3,6 @@
 #include <iostream>
 #include <set>
 
-#include "global_defs.hh"
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
 

@@ -41,11 +41,16 @@ struct VertexBasic {
     }
 };
 
+struct UniformBufferObject0 {
+    glm::vec3 color;
+};
+
 namespace render {
 class Pipeline {
 private:
     vk::raii::ShaderModule _vertShaderModule = 0;
     vk::raii::ShaderModule _fragShaderModule = 0;
+    vk::raii::DescriptorSetLayout _descriptorSetLayout = 0;
     vk::raii::PipelineLayout _layout = 0;
     vk::raii::RenderPass _renderPass = 0;
     vk::raii::Pipeline _pipeline = 0;
@@ -55,6 +60,7 @@ private:
     void createFragShaderModule(const vk::raii::Device& device);
     static vk::raii::ShaderModule createShaderModule(const vk::raii::Device& device,
                                                      const std::string& path, SHADER_TYPE type);
+    void createDescriptorSetLayout(const vk::raii::Device& device);
     void createPipelineLayout(const vk::raii::Device& device);
     void createRenderPass(const vk::raii::Device& device, vk::Format format);
     void createGraphicsPipeline(const vk::raii::Device& device);

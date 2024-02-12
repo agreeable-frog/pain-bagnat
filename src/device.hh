@@ -6,6 +6,8 @@
 #include "instance.hh"
 #include "vk_mem_alloc.h"
 
+const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
 namespace render {
 struct SwapChainSupport {
     vk::SurfaceCapabilitiesKHR capabilities;
