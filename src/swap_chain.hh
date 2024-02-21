@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 #include <vector>
+#include <memory>
 
 #include "device.hh"
 #include "display.hh"
@@ -9,20 +10,22 @@
 namespace render {
 class SwapChain {
 private:
-    vk::raii::SwapchainKHR _swapChain = 0;
+    std::shared_ptr<const render::Display> _pDisplay;
+    std::shared_ptr<const render::Device> _pDevice;
     uint32_t _imageCount;
     vk::SurfaceFormatKHR _surfaceFormat = {vk::Format::eB8G8R8A8Srgb,
                                            vk::ColorSpaceKHR::eSrgbNonlinear};
     vk::PresentModeKHR _presentMode = vk::PresentModeKHR::eMailbox;
     vk::Extent2D _extent;
+    vk::raii::SwapchainKHR _swapChain = 0;
     std::vector<vk::raii::ImageView> _imageViews;
 
-    void createSwapChain(const vk::raii::Device& device, const vk::raii::SurfaceKHR& surface,
-                         const SwapChainSupport deviceSwapChainSupport);
-    void createImageViews(const vk::raii::Device& device);
+    void createSwapChain();
+    void createImageViews();
 
 public:
-    SwapChain(const render::Display& display, const render::Device& device);
+    SwapChain(std::shared_ptr<const render::Display> pDisplay,
+              std::shared_ptr<const render::Device> pDevice);
     vk::SurfaceFormatKHR surfaceFormat() const {
         return _surfaceFormat;
     }

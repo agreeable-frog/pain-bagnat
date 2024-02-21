@@ -4,23 +4,24 @@
 
 namespace render {
 
-SwapChain::SwapChain(const render::Display& display, const render::Device& device) {
-    _extent.width =
-        std::clamp(display.width(), device.swapChainSupport().capabilities.minImageExtent.width,
-                   device.swapChainSupport().capabilities.maxImageExtent.width);
-    _extent.height =
-        std::clamp(display.height(), device.swapChainSupport().capabilities.minImageExtent.height,
-                   device.swapChainSupport().capabilities.maxImageExtent.height);
-    _imageCount = device.swapChainSupport().capabilities.minImageCount + 1;
-    createSwapChain(device.device(), display.surface(), device.swapChainSupport());
-    createImageViews(device.device());
+SwapChain::SwapChain(std::shared_ptr<const render::Display> pDisplay,
+                     std::shared_ptr<const render::Device> pDevice)
+    : _pDisplay(pDisplay), _pDevice(pDevice) {
+    _extent.width = std::clamp(_pDisplay->width(),
+                               _pDevice->swapChainSupport().capabilities.minImageExtent.width,
+                               _pDevice->swapChainSupport().capabilities.maxImageExtent.width);
+    _extent.height = std::clamp(_pDisplay->height(),
+                                _pDevice->swapChainSupport().capabilities.minImageExtent.height,
+                                _pDevice->swapChainSupport().capabilities.maxImageExtent.height);
+    _imageCount = _pDevice->swapChainSupport().capabilities.minImageCount + 1;
+    createSwapChain();
+    createImageViews();
 }
 
-void SwapChain::createSwapChain(const vk::raii::Device& device, const vk::raii::SurfaceKHR& surface,
-                                const SwapChainSupport deviceSwapChainSupport) {
+void SwapChain::createSwapChain() {
     try {
         vk::SwapchainCreateInfoKHR swapChainCreateInfo;
-        swapChainCreateInfo.surface = *surface;
+        swapChainCreateInfo.surface = *_pDisplay->surface();
         swapChainCreateInfo.minImageCount = _imageCount;
         swapChainCreateInfo.imageFormat = _surfaceFormat.format;
         swapChainCreateInfo.imageColorSpace = _surfaceFormat.colorSpace;
@@ -30,19 +31,20 @@ void SwapChain::createSwapChain(const vk::raii::Device& device, const vk::raii::
         swapChainCreateInfo.imageSharingMode =
             vk::SharingMode::eExclusive; // graphics and present queue families
                                          // are the same
-        swapChainCreateInfo.preTransform = deviceSwapChainSupport.capabilities.currentTransform;
+        swapChainCreateInfo.preTransform =
+            _pDevice->swapChainSupport().capabilities.currentTransform;
         swapChainCreateInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
         swapChainCreateInfo.presentMode = _presentMode;
         swapChainCreateInfo.clipped = VK_TRUE;
         swapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
-        _swapChain = device.createSwapchainKHR(swapChainCreateInfo);
+        _swapChain = _pDevice->device().createSwapchainKHR(swapChainCreateInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating swapchain : " << e.what() << '\n';
         exit(-1);
     }
 }
 
-void SwapChain::createImageViews(const vk::raii::Device& device) {
+void SwapChain::createImageViews() {
     try {
         auto swapChainImages = _swapChain.getImages();
         for (auto& image : swapChainImages) {
@@ -59,7 +61,7 @@ void SwapChain::createImageViews(const vk::raii::Device& device) {
             imageViewCreateInfo.subresourceRange.levelCount = 1;
             imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
             imageViewCreateInfo.subresourceRange.layerCount = 1;
-            _imageViews.push_back(device.createImageView(imageViewCreateInfo));
+            _imageViews.push_back(_pDevice->device().createImageView(imageViewCreateInfo));
         }
     } catch (std::exception& e) {
         std::cerr << "Error while creating swapchain image views : " << e.what() << '\n';

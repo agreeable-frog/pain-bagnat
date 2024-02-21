@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 #include <vector>
+#include <memory>
 
 #include "instance.hh"
 #include "vk_mem_alloc.h"
@@ -23,6 +24,7 @@ struct QueueFamily {
 class Device {
 public:
 private:
+    std::shared_ptr<const render::Instance> _pInstance;
     vk::raii::PhysicalDevice _physicalDevice = 0;
     vk::raii::Device _device = 0;
     VmaAllocator _allocator;
@@ -35,13 +37,12 @@ private:
     vk::raii::CommandPool _transferCommandPool = 0;
     vk::raii::CommandBuffer _graphicsCommandBuffer = 0;
 
-    void selectPhysicalDevice(const vk::raii::Instance& instance,
-                              const vk::raii::SurfaceKHR& surface);
+    void selectPhysicalDevice(const vk::raii::SurfaceKHR& surface);
     void listPhysicalDeviceQueueFamilies(const vk::raii::SurfaceKHR& surface) const;
     void selectGraphicsQueueFamily(const vk::raii::SurfaceKHR& surface);
     void selectTransferQueueFamily();
-    void createDevice(const vk::raii::Instance& instance);
-    void createAllocator(const vk::raii::Instance& instance);
+    void createDevice();
+    void createAllocator();
     void createGraphicsQueue();
     void createTransferQueue();
     void createGraphicsCommandPool();
@@ -49,7 +50,7 @@ private:
     void createGraphicsCommandBuffer();
 
 public:
-    Device(const render::Instance& instance, const vk::raii::SurfaceKHR& surface);
+    Device(std::shared_ptr<const render::Instance> pInstance, const vk::raii::SurfaceKHR& surface);
     ~Device();
     uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
     const vk::raii::PhysicalDevice& physicalDevice() const {

@@ -1,4 +1,5 @@
 #include <vulkan/vulkan_raii.hpp>
+#include <memory>
 
 #include "instance.hh"
 #include "display.hh"
@@ -8,13 +9,13 @@
 #include "buffer.hh"
 
 int main(void) {
-    render::Instance instance = render::Instance();
-    render::Display display = render::Display(instance, "window", 800, 450);
+    std::shared_ptr<render::Instance> pInstance = std::make_shared<render::Instance>();
+    std::shared_ptr<render::Display> pDisplay = std::make_shared<render::Display>(pInstance, "window", 800, 450);
 
-    render::Device device = render::Device(instance, display.surface());
-    render::SwapChain swapChain = render::SwapChain(display, device);
+    std::shared_ptr<render::Device> pDevice = std::make_shared<render::Device>(pInstance, pDisplay->surface());
+    std::shared_ptr<render::SwapChain> pSwapChain = std::make_shared<render::SwapChain>(pDisplay, pDevice);
 
-    render::Pipeline pipeline = render::Pipeline(device, swapChain);
+    std::shared_ptr<render::Pipeline> pPipeline = std::make_shared<render::Pipeline>(pDevice, pSwapChain);
 
     std::vector<VertexBasic> vertices = {{{0.8, -0.8, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
                                          {{-0.8, -0.8, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
@@ -25,32 +26,32 @@ int main(void) {
 
     std::vector<uint32_t> indices = {0, 1, 2, 0, 2, 3};
 
-    render::Buffer vertexBuffer = render::Buffer(device, sizeof(VertexBasic) * vertices.size(),
+    render::Buffer vertexBuffer = render::Buffer(*pDevice, sizeof(VertexBasic) * vertices.size(),
                                                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    vertexBuffer.mapData(device, vertices.data(), sizeof(VertexBasic) * vertices.size());
+    vertexBuffer.mapData(*pDevice, vertices.data(), sizeof(VertexBasic) * vertices.size());
 
     render::Buffer indexBuffer =
-        render::Buffer(device, sizeof(uint32_t) * indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    indexBuffer.mapData(device, indices.data(), sizeof(uint32_t) * indices.size());
+        render::Buffer(*pDevice, sizeof(uint32_t) * indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    indexBuffer.mapData(*pDevice, indices.data(), sizeof(uint32_t) * indices.size());
 
     vk::raii::Semaphore imageAvailableSemaphore = 0;
     vk::raii::Semaphore renderFinishedSemaphore = 0;
     vk::raii::Fence inFlightFence = 0;
     try {
         vk::SemaphoreCreateInfo semaphoreInfo;
-        imageAvailableSemaphore = device.device().createSemaphore(semaphoreInfo);
-        renderFinishedSemaphore = device.device().createSemaphore(semaphoreInfo);
+        imageAvailableSemaphore = pDevice->device().createSemaphore(semaphoreInfo);
+        renderFinishedSemaphore = pDevice->device().createSemaphore(semaphoreInfo);
 
         vk::FenceCreateInfo fenceInfo;
         fenceInfo.flags = vk::FenceCreateFlagBits::eSignaled;
-        inFlightFence = device.device().createFence(fenceInfo);
+        inFlightFence = pDevice->device().createFence(fenceInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating sync elements : " << e.what() << '\n';
         exit(-1);
     }
 
     // Main loop
-    while (!glfwWindowShouldClose(display.pWindow())) {
+    while (!glfwWindowShouldClose(pDisplay->pWindow())) {
         static double lastFrameTime = glfwGetTime();
         double currentTime = glfwGetTime();
         double deltaTime = currentTime - lastFrameTime;
@@ -71,63 +72,63 @@ int main(void) {
                 timeRef = 0.0;
             }
         }
-        auto result = device.device().waitForFences(*inFlightFence, true, UINT_FAST64_MAX);
-        device.device().resetFences(*inFlightFence);
+        auto result = pDevice->device().waitForFences(*inFlightFence, true, UINT_FAST64_MAX);
+        pDevice->device().resetFences(*inFlightFence);
         uint32_t imageIndex =
-            swapChain.swapChain()
+            pSwapChain->swapChain()
                 .acquireNextImage(UINT_FAST64_MAX, *imageAvailableSemaphore, nullptr)
                 .second;
-        device.graphicsCommandBuffer().reset();
+        pDevice->graphicsCommandBuffer().reset();
 
         vk::CommandBufferBeginInfo beginInfo;
-        device.graphicsCommandBuffer().begin(beginInfo);
+        pDevice->graphicsCommandBuffer().begin(beginInfo);
         vk::RenderPassBeginInfo renderPassInfo;
-        renderPassInfo.renderPass = *pipeline.renderPass();
-        renderPassInfo.framebuffer = *pipeline.framebuffers()[imageIndex];
+        renderPassInfo.renderPass = *pPipeline->renderPass();
+        renderPassInfo.framebuffer = *pPipeline->framebuffers()[imageIndex];
         renderPassInfo.renderArea.offset = vk::Offset2D{0, 0};
-        renderPassInfo.renderArea.extent = swapChain.extent();
+        renderPassInfo.renderArea.extent = pSwapChain->extent();
         vk::ClearValue clearValue = vk::ClearValue{{0.0f, 0.0f, 0.0f, 1.0f}};
         renderPassInfo.setClearValues(clearValue);
-        device.graphicsCommandBuffer().beginRenderPass(renderPassInfo,
+        pDevice->graphicsCommandBuffer().beginRenderPass(renderPassInfo,
                                                        vk::SubpassContents::eInline);
-        device.graphicsCommandBuffer().bindPipeline(vk::PipelineBindPoint::eGraphics,
-                                                    *pipeline.pipeline());
-        device.graphicsCommandBuffer().bindVertexBuffers(0, {vertexBuffer.buffer()}, {0});
-        device.graphicsCommandBuffer().bindIndexBuffer(indexBuffer.buffer(), 0, vk::IndexType::eUint32);
+        pDevice->graphicsCommandBuffer().bindPipeline(vk::PipelineBindPoint::eGraphics,
+                                                    *pPipeline->pipeline());
+        pDevice->graphicsCommandBuffer().bindVertexBuffers(0, {vertexBuffer.buffer()}, {0});
+        pDevice->graphicsCommandBuffer().bindIndexBuffer(indexBuffer.buffer(), 0, vk::IndexType::eUint32);
 
         vk::Viewport viewport;
         viewport.x = 0.0f;
         viewport.y = 0.0f;
-        viewport.width = static_cast<float>(swapChain.extent().width);
-        viewport.height = static_cast<float>(swapChain.extent().height);
+        viewport.width = static_cast<float>(pSwapChain->extent().width);
+        viewport.height = static_cast<float>(pSwapChain->extent().height);
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
-        device.graphicsCommandBuffer().setViewport(0, viewport);
+        pDevice->graphicsCommandBuffer().setViewport(0, viewport);
 
         vk::Rect2D scissor;
         scissor.offset = vk::Offset2D{0, 0};
-        scissor.extent = swapChain.extent();
-        device.graphicsCommandBuffer().setScissor(0, scissor);
+        scissor.extent = pSwapChain->extent();
+        pDevice->graphicsCommandBuffer().setScissor(0, scissor);
 
-        device.graphicsCommandBuffer().drawIndexed((uint32_t)indices.size(), 1, 0, 0, 0);
-        device.graphicsCommandBuffer().endRenderPass();
-        device.graphicsCommandBuffer().end();
+        pDevice->graphicsCommandBuffer().drawIndexed((uint32_t)indices.size(), 1, 0, 0, 0);
+        pDevice->graphicsCommandBuffer().endRenderPass();
+        pDevice->graphicsCommandBuffer().end();
 
         vk::SubmitInfo submitInfo;
         submitInfo.setWaitSemaphores(*imageAvailableSemaphore);
         vk::PipelineStageFlags waitStages = vk::PipelineStageFlagBits::eColorAttachmentOutput;
         submitInfo.setWaitDstStageMask(waitStages);
-        submitInfo.setCommandBuffers(*device.graphicsCommandBuffer());
+        submitInfo.setCommandBuffers(*pDevice->graphicsCommandBuffer());
         submitInfo.setSignalSemaphores(*renderFinishedSemaphore);
-        device.graphicsQueue().submit(submitInfo, *inFlightFence);
+        pDevice->graphicsQueue().submit(submitInfo, *inFlightFence);
 
         vk::PresentInfoKHR presentInfo;
         presentInfo.setWaitSemaphores(*renderFinishedSemaphore);
-        presentInfo.setSwapchains(*swapChain.swapChain());
+        presentInfo.setSwapchains(*pSwapChain->swapChain());
         presentInfo.setImageIndices(imageIndex);
-        device.graphicsQueue().presentKHR(presentInfo);
+        pDevice->graphicsQueue().presentKHR(presentInfo);
 
         glfwPollEvents();
     }
-    device.device().waitIdle();
+    pDevice->device().waitIdle();
 }

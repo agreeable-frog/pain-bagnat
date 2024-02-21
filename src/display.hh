@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan_raii.hpp>
 #include <string>
+#include <memory>
 
 #include "instance.hh"
 
@@ -11,16 +12,18 @@ namespace render {
 
 class Display {
 private:
-    GLFWwindow* _pWindow;
+    std::shared_ptr<const render::Instance> _pInstance;
     uint _width;
     uint _height;
+    std::string _name;
+    GLFWwindow* _pWindow;
     vk::raii::SurfaceKHR _surface = 0;
 
-    void createWindow(const std::string& name, uint width, uint height);
-    void createSurface(const vk::raii::Instance& instance);
+    void createWindow();
+    void createSurface();
 
 public:
-    Display(const render::Instance& instance, const std::string& name, uint width, uint height);
+    Display(std::shared_ptr<const render::Instance> instance, const std::string& name, uint width, uint height);
     ~Display() {
         glfwDestroyWindow(_pWindow);
     }

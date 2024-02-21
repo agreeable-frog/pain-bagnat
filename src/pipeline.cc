@@ -5,24 +5,23 @@
 #include "build_defs.hh"
 
 namespace render {
-void Pipeline::createVertShaderModule(const vk::raii::Device& device) {
-    _vertShaderModule = createShaderModule(
-        device, std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.vert", SHADER_TYPE::VERT);
+void Pipeline::createVertShaderModule() {
+    _vertShaderModule = createShaderModule(std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.vert",
+                                           SHADER_TYPE::VERT);
 }
 
-void Pipeline::createFragShaderModule(const vk::raii::Device& device) {
-    _fragShaderModule = createShaderModule(
-        device, std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.frag", SHADER_TYPE::FRAG);
+void Pipeline::createFragShaderModule() {
+    _fragShaderModule = createShaderModule(std::string(PROJECT_SOURCE_DIR) + "/shaders/basic.frag",
+                                           SHADER_TYPE::FRAG);
 }
 
-vk::raii::ShaderModule Pipeline::createShaderModule(const vk::raii::Device& device,
-                                                    const std::string& path, SHADER_TYPE type) {
+vk::raii::ShaderModule Pipeline::createShaderModule(const std::string& path, SHADER_TYPE type) {
     try {
         auto spv = ShaderCompiler::compileAssembly(path, type);
 
         vk::ShaderModuleCreateInfo shaderModuleCreateInfo;
         shaderModuleCreateInfo.setCode(spv);
-        return device.createShaderModule(shaderModuleCreateInfo);
+        return _pDevice->device().createShaderModule(shaderModuleCreateInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating shader module from " << path << " : " << e.what()
                   << '\n';
@@ -30,7 +29,7 @@ vk::raii::ShaderModule Pipeline::createShaderModule(const vk::raii::Device& devi
     }
 }
 
-void Pipeline::createDescriptorSetLayout(const vk::raii::Device& device) {
+void Pipeline::createDescriptorSetLayout() {
     try {
         vk::DescriptorSetLayoutBinding uboLayoutBinding;
         uboLayoutBinding.binding = 0;
@@ -40,27 +39,28 @@ void Pipeline::createDescriptorSetLayout(const vk::raii::Device& device) {
 
         vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutInfo;
         descriptorSetLayoutInfo.setBindings(uboLayoutBinding);
-        _descriptorSetLayout = device.createDescriptorSetLayout(descriptorSetLayoutInfo);
+        _descriptorSetLayout =
+            _pDevice->device().createDescriptorSetLayout(descriptorSetLayoutInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating descriptor set layout : " << e.what() << '\n';
         exit(-1);
     }
 }
 
-void Pipeline::createPipelineLayout(const vk::raii::Device& device) {
+void Pipeline::createPipelineLayout() {
     try {
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
         // pipelineLayoutInfo.setSetLayouts(*_descriptorSetLayout);
-        _layout = device.createPipelineLayout(pipelineLayoutInfo);
+        _layout = _pDevice->device().createPipelineLayout(pipelineLayoutInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating pipeline layout : " << e.what() << '\n';
         exit(-1);
     }
 }
 
-void Pipeline::createRenderPass(const vk::raii::Device& device, vk::Format format) {
+void Pipeline::createRenderPass() {
     vk::AttachmentDescription colorAttachment;
-    colorAttachment.format = format;
+    colorAttachment.format = _pSwapChain->surfaceFormat().format;
     colorAttachment.samples = vk::SampleCountFlagBits::e1;
     colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -89,14 +89,14 @@ void Pipeline::createRenderPass(const vk::raii::Device& device, vk::Format forma
         dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
         dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
         renderPassInfo.setDependencies(dependency);
-        _renderPass = device.createRenderPass(renderPassInfo);
+        _renderPass = _pDevice->device().createRenderPass(renderPassInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating renderPass : " << e.what() << '\n';
         exit(-1);
     }
 }
 
-void Pipeline::createGraphicsPipeline(const vk::raii::Device& device) {
+void Pipeline::createGraphicsPipeline() {
     vk::PipelineShaderStageCreateInfo vertShaderStageInfo;
     vertShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
     vertShaderStageInfo.module = *_vertShaderModule;
@@ -165,27 +165,25 @@ void Pipeline::createGraphicsPipeline(const vk::raii::Device& device) {
     graphicsPipelineInfo.setRenderPass(*_renderPass);
 
     try {
-        _pipeline = device.createGraphicsPipeline(nullptr, graphicsPipelineInfo);
+        _pipeline = _pDevice->device().createGraphicsPipeline(nullptr, graphicsPipelineInfo);
     } catch (std::exception& e) {
         std::cerr << "Error while creating graphics pipeline : " << e.what() << '\n';
         exit(-1);
     }
 }
 
-void Pipeline::createFramebuffers(const vk::raii::Device& device,
-                                  const std::vector<vk::raii::ImageView>& imageViews,
-                                  vk::Extent2D extent) {
-    _framebuffers.reserve(imageViews.size());
-    for (size_t i = 0; i < imageViews.size(); i++) {
+void Pipeline::createFramebuffers() {
+    _framebuffers.reserve(_pSwapChain->imageViews().size());
+    for (size_t i = 0; i < _pSwapChain->imageViews().size(); i++) {
         try {
-            vk::ImageView attachments[] = {*imageViews.at(i)};
+            vk::ImageView attachments[] = {*(_pSwapChain->imageViews()).at(i)};
             vk::FramebufferCreateInfo framebufferInfo{};
             framebufferInfo.renderPass = *_renderPass;
             framebufferInfo.setAttachments(attachments);
-            framebufferInfo.width = extent.width;
-            framebufferInfo.height = extent.height;
+            framebufferInfo.width = _pSwapChain->extent().width;
+            framebufferInfo.height = _pSwapChain->extent().height;
             framebufferInfo.layers = 1;
-            _framebuffers.push_back(device.createFramebuffer(framebufferInfo));
+            _framebuffers.push_back(_pDevice->device().createFramebuffer(framebufferInfo));
         } catch (std::exception& e) {
             std::cerr << "Error while creating framebuffer : " << e.what() << '\n';
             exit(-1);
@@ -193,13 +191,15 @@ void Pipeline::createFramebuffers(const vk::raii::Device& device,
     }
 }
 
-Pipeline::Pipeline(const render::Device& device, const render::SwapChain& swapChain) {
-    createVertShaderModule(device.device());
-    createFragShaderModule(device.device());
-    // createDescriptorSetLayout(device.device());
-    createPipelineLayout(device.device());
-    createRenderPass(device.device(), swapChain.surfaceFormat().format);
-    createGraphicsPipeline(device.device());
-    createFramebuffers(device.device(), swapChain.imageViews(), swapChain.extent());
+Pipeline::Pipeline(std::shared_ptr<const render::Device> pDevice,
+                   std::shared_ptr<const render::SwapChain> pSwapChain)
+    : _pDevice(pDevice), _pSwapChain(pSwapChain) {
+    createVertShaderModule();
+    createFragShaderModule();
+    // createDescriptorSetLayout();
+    createPipelineLayout();
+    createRenderPass();
+    createGraphicsPipeline();
+    createFramebuffers();
 }
 } // namespace render

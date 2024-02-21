@@ -8,10 +8,9 @@
 
 namespace render {
 
-void Device::selectPhysicalDevice(const vk::raii::Instance& instance,
-                                  const vk::raii::SurfaceKHR& surface) {
+void Device::selectPhysicalDevice(const vk::raii::SurfaceKHR& surface) {
     try {
-        vk::raii::PhysicalDevices physicalDevices(instance);
+        vk::raii::PhysicalDevices physicalDevices(*_pInstance);
         if (physicalDevices.size() == 0) {
             throw std::runtime_error("No physical device found");
         }
@@ -127,7 +126,7 @@ void Device::selectTransferQueueFamily() {
     }
 }
 
-void Device::createDevice(const vk::raii::Instance& instance) {
+void Device::createDevice() {
     try {
         std::vector<vk::DeviceQueueCreateInfo> queuesCreateInfo;
 
@@ -161,10 +160,10 @@ void Device::createDevice(const vk::raii::Instance& instance) {
     }
 }
 
-void Device::createAllocator(const vk::raii::Instance& instance) {
+void Device::createAllocator() {
     VmaAllocatorCreateInfo allocatorCreateInfo{}; // Don't forget to zero init!!!
     allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
-    allocatorCreateInfo.instance = *instance;
+    allocatorCreateInfo.instance = *_pInstance->instance();
     allocatorCreateInfo.physicalDevice = *_physicalDevice;
     allocatorCreateInfo.device = *_device;
     auto result = vmaCreateAllocator(&allocatorCreateInfo, &_allocator);
@@ -232,13 +231,13 @@ void Device::createGraphicsCommandBuffer() {
     }
 }
 
-Device::Device(const render::Instance& instance, const vk::raii::SurfaceKHR& surface) {
-    selectPhysicalDevice(instance, surface);
+Device::Device(std::shared_ptr<const render::Instance> pInstance, const vk::raii::SurfaceKHR& surface) : _pInstance(pInstance) {
+    selectPhysicalDevice(surface);
     listPhysicalDeviceQueueFamilies(surface);
     selectGraphicsQueueFamily(surface);
     selectTransferQueueFamily();
-    createDevice(instance);
-    createAllocator(instance);
+    createDevice();
+    createAllocator();
     createGraphicsQueue();
     createTransferQueue();
     createGraphicsCommandPool();

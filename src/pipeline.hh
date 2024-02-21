@@ -3,6 +3,7 @@
 #include <array>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
+#include <memory>
 
 #include "device.hh"
 #include "swap_chain.hh"
@@ -22,17 +23,17 @@ struct VertexBasic {
     }
 
     static std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions() {
-        std::array <vk::VertexInputAttributeDescription, 3> attributeDescriptions;
+        std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions;
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
         attributeDescriptions[0].format = vk::Format::eR32G32B32Sfloat;
         attributeDescriptions[0].offset = offsetof(VertexBasic, position);
-    
+
         attributeDescriptions[1].binding = 0;
         attributeDescriptions[1].location = 1;
         attributeDescriptions[1].format = vk::Format::eR32G32B32Sfloat;
         attributeDescriptions[1].offset = offsetof(VertexBasic, normal);
-    
+
         attributeDescriptions[2].binding = 0;
         attributeDescriptions[2].location = 2;
         attributeDescriptions[2].format = vk::Format::eR32G32Sfloat;
@@ -48,6 +49,8 @@ struct UniformBufferObject0 {
 namespace render {
 class Pipeline {
 private:
+    std::shared_ptr<const render::Device> _pDevice;
+    std::shared_ptr<const render::SwapChain> _pSwapChain;
     vk::raii::ShaderModule _vertShaderModule = 0;
     vk::raii::ShaderModule _fragShaderModule = 0;
     vk::raii::DescriptorSetLayout _descriptorSetLayout = 0;
@@ -56,20 +59,18 @@ private:
     vk::raii::Pipeline _pipeline = 0;
     std::vector<vk::raii::Framebuffer> _framebuffers;
 
-    void createVertShaderModule(const vk::raii::Device& device);
-    void createFragShaderModule(const vk::raii::Device& device);
-    static vk::raii::ShaderModule createShaderModule(const vk::raii::Device& device,
-                                                     const std::string& path, SHADER_TYPE type);
-    void createDescriptorSetLayout(const vk::raii::Device& device);
-    void createPipelineLayout(const vk::raii::Device& device);
-    void createRenderPass(const vk::raii::Device& device, vk::Format format);
-    void createGraphicsPipeline(const vk::raii::Device& device);
-    void createFramebuffers(const vk::raii::Device& device,
-                            const std::vector<vk::raii::ImageView>& imageViews,
-                            vk::Extent2D extent);
+    void createVertShaderModule();
+    void createFragShaderModule();
+    vk::raii::ShaderModule createShaderModule(const std::string& path, SHADER_TYPE type);
+    void createDescriptorSetLayout();
+    void createPipelineLayout();
+    void createRenderPass();
+    void createGraphicsPipeline();
+    void createFramebuffers();
 
 public:
-    Pipeline(const render::Device& device, const render::SwapChain& swapChain);
+    Pipeline(std::shared_ptr<const render::Device> pDevice,
+             std::shared_ptr<const render::SwapChain> pSwapChain);
     const vk::raii::RenderPass& renderPass() const {
         return _renderPass;
     }
